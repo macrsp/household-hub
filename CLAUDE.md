@@ -92,8 +92,8 @@ holds the step-by-step.
 PLANS.md includes a `## User-Asset Durability` section and a Write-Path
 Checklist. `messages`, `people`, `endpoints`, `conversations`, `participants`,
 and `deliveries` are user-asset record classes — any plan touching their write
-paths must follow those invariants. Document the canonical user-asset manifest
-in the D1 schema docs once they exist, and link it here.
+paths must follow those invariants. The canonical user-asset manifest is
+documented in [`migrations/README.md`](migrations/README.md).
 
 ## Branch naming
 
