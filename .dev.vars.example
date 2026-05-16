@@ -1,0 +1,13 @@
+# Local development secrets for `wrangler pages dev`.
+#
+# Copy this file to `.dev.vars` (which is git-ignored) and fill in values to
+# exercise real outbound SMS locally. When any of the three is blank/absent,
+# household-hub stubs SMS sending (logs the would-send line, marks the delivery
+# `sent_stubbed`) so the relay works end-to-end without a Twilio account.
+#
+# In production these are set with `wrangler pages secret put <NAME>` and must
+# never be committed.
+
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
