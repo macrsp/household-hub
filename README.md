@@ -157,5 +157,9 @@ deploy. Verify with `https://<deployment>/api/health` → `{"ok":true}`.
 - **Twilio request-signature validation** on the inbound webhook.
 - **Post-deploy data probes** — one invariant query per user-asset table; the
   queries are written out in [`migrations/README.md`](migrations/README.md).
-- Migrate `kit.csrf.checkOrigin` to `kit.csrf.trustedOrigins` once the exact
-  `Origin` Twilio sends (if any) is known — it is a deprecated setting.
+- `kit.csrf.checkOrigin` is `false` and must stay false: SvelteKit's CSRF
+  check rejects any form-content-type POST whose `Origin` is absent, and the
+  Twilio webhook (a server-to-server POST) sends no `Origin`, so
+  `trustedOrigins` cannot admit it. If SvelteKit removes the deprecated
+  `checkOrigin`, move the webhook to its own non-SvelteKit Worker route. See
+  `.agent/post-v1-roadmap.md` M5.

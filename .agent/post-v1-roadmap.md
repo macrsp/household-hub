@@ -55,9 +55,13 @@ when each is reached.
   absent (local/dev). `src/lib/server/sms.test.ts` pins the algorithm against
   a cross-checked vector. Verified: 20 unit tests pass; webhook still
   `200`/`403` with no token configured.
-- [ ] **M5 — CSRF hardening.** Resolve the deprecated `kit.csrf.checkOrigin =
-  false`: determine the inbound webhook's real cross-origin shape and move to
-  the narrowest correct `kit.csrf.trustedOrigins` configuration.
+- [x] (2026-05-16) **M5 — CSRF hardening.** Investigated SvelteKit's CSRF
+  check (`@sveltejs/kit` `respond.js`): it forbids any form-content-type POST
+  whose `Origin` is absent or unmatched, and `trustedOrigins` only whitelists
+  *present* origins. The Twilio webhook sends no `Origin`, so `trustedOrigins`
+  cannot admit it — `checkOrigin: false` is the only working setting and must
+  stay. `svelte.config.js` and `README.md` now document this definitively so
+  the deprecation is not naively "fixed" in a way that breaks the webhook.
 - [ ] **M6 — Multiple conversations.** Inbound-SMS routing to a conversation
   other than `general`, and a conversation switcher in the PWA. (Feature —
   flesh out when reached; touches `messages` writes.)
@@ -115,6 +119,19 @@ when each is reached.
   Rationale: the operator asked for multi-milestone plans so a new ExecPlan is
   not written for every change.
   Date/Author: 2026-05-16 / roadmap author.
+
+- Decision (M5): keep `kit.csrf.checkOrigin = false`; do not migrate to
+  `trustedOrigins`.
+  Rationale: SvelteKit's CSRF check (`respond.js`) forbids a form-content-type
+  POST when `request_origin !== url.origin && (!request_origin ||
+  !trustedOrigins.includes(request_origin))`. A request with no `Origin`
+  header always fails. Twilio's webhook is a server-to-server POST with no
+  `Origin`, so no `trustedOrigins` value admits it. Disabling the check is
+  required; it does not weaken the app (its own writes are `application/json`,
+  never CSRF-checked) and the webhook is protected by Twilio signature
+  validation (M4). If upstream removes `checkOrigin`, the webhook moves to a
+  dedicated non-SvelteKit Worker route.
+  Date/Author: 2026-05-16 / M5.
 
 ## Outcomes & Retrospective
 
