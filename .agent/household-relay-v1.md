@@ -16,7 +16,7 @@ You can see it working at the end: with the development server running, loading 
 
 - [x] (2026-05-16) ExecPlan authored from the v1 build specification and `.agent/PLANS.md`.
 - [x] (2026-05-16) Milestone 1 — SvelteKit + Cloudflare scaffold, D1 schema, seed data, health route. `npm run check` clean (0 errors, 0 warnings), `npm run build` green via `@sveltejs/adapter-cloudflare`, local D1 migrated + seeded (people 3, endpoints 3, conversations 1, participants 3), `GET /api/health` returns `{"ok":true}` with HTTP 200.
-- [ ] Milestone 2 — Canonical message store and the app-transport read/write API.
+- [x] (2026-05-16) Milestone 2 — Canonical message store and the app-transport read/write API. `GET /api/people`, `GET /api/conversations`, `GET /api/conversations/[slug]/messages` (oldest-first, author name joined), and `POST .../messages` (validates body + author, stores `source_transport='app'`). Verified by curl: valid POST → 201; empty body and unknown author → 400; unknown conversation → 404; posted message returned by GET with `author_name`.
 - [ ] Milestone 3 — Fanout helper and the outbound SMS adapter (stubbed without Twilio credentials).
 - [ ] Milestone 4 — Inbound SMS webhook.
 - [ ] Milestone 5 — The PWA front-end page.
