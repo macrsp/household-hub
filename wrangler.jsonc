@@ -6,18 +6,13 @@
 	"pages_build_output_dir": ".svelte-kit/cloudflare",
 
 	// Cloudflare D1 — the canonical relational store. The app reaches it as
-	// event.platform.env.DB.
-	//
-	// database_id below is a PLACEHOLDER (all-zero UUID). Local development
-	// (`wrangler d1 ... --local`, used by db:migrate:local / db:seed:local /
-	// `wrangler pages dev`) operates on a local SQLite file and ignores it.
-	// Before any remote work, run `wrangler d1 create household-hub-db` and
-	// paste the real printed database_id here — see README "Cloudflare setup".
+	// event.platform.env.DB. database_id is the real id of the
+	// `household-hub-db` D1 database (created 2026-05-16, region ENAM).
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "household-hub-db",
-			"database_id": "00000000-0000-0000-0000-000000000000"
+			"database_id": "e0e4439e-7bf6-4e53-bccc-b0bb1e855cfb"
 		}
 	]
 
