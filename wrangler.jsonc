@@ -1,0 +1,30 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "household-hub",
+	"compatibility_date": "2026-05-16",
+	// Cloudflare Pages serves the SvelteKit build output from this directory.
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+
+	// Cloudflare D1 — the canonical relational store. The app reaches it as
+	// event.platform.env.DB.
+	//
+	// database_id below is a PLACEHOLDER (all-zero UUID). Local development
+	// (`wrangler d1 ... --local`, used by db:migrate:local / db:seed:local /
+	// `wrangler pages dev`) operates on a local SQLite file and ignores it.
+	// Before any remote work, run `wrangler d1 create household-hub-db` and
+	// paste the real printed database_id here — see README "Cloudflare setup".
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "household-hub-db",
+			"database_id": "00000000-0000-0000-0000-000000000000"
+		}
+	]
+
+	// TODO(queues): v1 fans messages out synchronously (see
+	// .agent/household-relay-v1.md, Decision Log). When fanout moves async,
+	// add a queue binding here, e.g.:
+	//   "queues": {
+	//     "producers": [{ "binding": "FANOUT", "queue": "household-hub-fanout" }]
+	//   }
+}

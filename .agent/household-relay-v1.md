@@ -15,7 +15,7 @@ You can see it working at the end: with the development server running, loading 
 ## Progress
 
 - [x] (2026-05-16) ExecPlan authored from the v1 build specification and `.agent/PLANS.md`.
-- [ ] Milestone 1 — SvelteKit + Cloudflare scaffold, D1 schema, seed data, health route.
+- [x] (2026-05-16) Milestone 1 — SvelteKit + Cloudflare scaffold, D1 schema, seed data, health route. `npm run check` clean (0 errors, 0 warnings), `npm run build` green via `@sveltejs/adapter-cloudflare`, local D1 migrated + seeded (people 3, endpoints 3, conversations 1, participants 3), `GET /api/health` returns `{"ok":true}` with HTTP 200.
 - [ ] Milestone 2 — Canonical message store and the app-transport read/write API.
 - [ ] Milestone 3 — Fanout helper and the outbound SMS adapter (stubbed without Twilio credentials).
 - [ ] Milestone 4 — Inbound SMS webhook.
@@ -26,7 +26,15 @@ Use timestamps on every entry as work proceeds, and split any partially complete
 
 ## Surprises & Discoveries
 
-Nothing yet. Record here, with concise evidence (command output is ideal), anything that contradicted an assumption in this plan — for example, how `event.platform.env` is shaped under the chosen adapter, or whether Cloudflare Queues consumers can be expressed inside the SvelteKit project without a second Worker.
+- Observation: `wrangler` cannot authenticate to Cloudflare non-interactively in this environment — the cached OAuth token expired and the automatic refresh failed.
+  Evidence: `npx wrangler d1 create household-hub-db` →
+      ✘ [ERROR] Failed to fetch auth token: 400 Bad Request
+      ✘ [ERROR] In a non-interactive environment, it's necessary to set a
+        CLOUDFLARE_API_TOKEN environment variable for wrangler to work.
+  Implication: every *remote* Cloudflare operation (`d1 create`, `d1 migrations apply --remote`, `pages deploy`) needs `CLOUDFLARE_API_TOKEN`. See the Decision Log.
+
+- Observation: local D1 operations need no Cloudflare auth and no real `database_id`. `wrangler d1 migrations apply --local` and `wrangler d1 execute --local` run against a SQLite file under `.wrangler/state/` and accept the all-zero placeholder UUID in `wrangler.jsonc`.
+  Evidence: `npm run db:migrate:local` → `0001_initial.sql ✅ 8 commands executed`; per-table `SELECT count(*)` → people 3, endpoints 3, conversations 1, participants 3, messages 0, deliveries 0.
 
 ## Decision Log
 
@@ -41,6 +49,14 @@ Nothing yet. Record here, with concise evidence (command output is ideal), anyth
 - Decision: SMS sending is **stubbed** (logged, delivery row marked `sent_stubbed`) whenever the three Twilio secrets are absent.
   Rationale: lets the entire relay be developed and demonstrated end-to-end without a paid Twilio account, while keeping the real send path in the same code path behind one `if`.
   Date/Author: 2026-05-16 / plan author.
+
+- Decision: `wrangler.jsonc`'s `d1_databases[0].database_id` holds the all-zero placeholder UUID `00000000-0000-0000-0000-000000000000` until a real Cloudflare database exists.
+  Rationale: every milestone's acceptance is local, and `--local` D1 operations ignore `database_id`. Creating the remote database needs Cloudflare auth not available non-interactively (see Surprises). The real id must be pasted in before any remote/deploy work; `wrangler.jsonc` and the README both say so.
+  Date/Author: 2026-05-16 / M1 implementer.
+
+- Decision: re-open the earlier "OAuth for now" Cloudflare-auth choice — automated/remote `wrangler` work in this repo needs a `CLOUDFLARE_API_TOKEN`, not OAuth.
+  Rationale: OAuth refresh requires an interactive browser flow a non-interactive agent cannot perform. This does not block local development or milestones 1–5's local acceptance, but it does block `wrangler d1 create`, `db:migrate:remote`, and `deploy`. A scoped API token is a prerequisite for the first remote deploy; recorded as a follow-up in the README.
+  Date/Author: 2026-05-16 / M1 implementer.
 
 ## Outcomes & Retrospective
 
