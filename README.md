@@ -132,33 +132,27 @@ local part of the `to` address (`general@…`, `groceries@…`), falling back to
 `general`.
 
 Cloudflare Email Routing cannot POST to an HTTP endpoint directly, so a small
-**Email Worker** forwards the parsed message. Configure Email Routing for your
-domain, route the household addresses to this Worker, and deploy it separately:
+**Email Worker** bridges it — it MIME-parses the routed mail and forwards a
+clean payload to the webhook with a shared-secret header. That Worker is
+checked in at [`email-worker/`](email-worker/); see its README to deploy it.
 
-    export default {
-      async email(message, env, ctx) {
-        const chunks = [];
-        for await (const chunk of message.raw) chunks.push(chunk);
-        const body = new TextDecoder().decode(
-          chunks.reduce((a, c) => new Uint8Array([...a, ...c]), new Uint8Array())
-        );
-        await fetch('https://household-hub.pages.dev/api/webhooks/email', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ from: message.from, to: message.to, body })
-        });
-      }
-    };
+When `EMAIL_WEBHOOK_SECRET` is set on the Pages project, the webhook rejects
+any request without the matching `X-Webhook-Secret` header (`403`). Set the
+same value on the Pages project and on the Email Worker:
 
-(For production, parse the MIME body rather than forwarding the raw message,
-and add a shared-secret header the webhook checks — analogous to the Twilio
-signature on the SMS webhook.)
+    wrangler pages secret put EMAIL_WEBHOOK_SECRET     # household-hub Pages project
+    cd email-worker && npx wrangler secret put EMAIL_WEBHOOK_SECRET
 
-Test the webhook directly with `curl` while `npm run preview` is running:
+Then, in Cloudflare Email Routing for your domain, add a custom address per
+conversation (`general@yourdomain`, `groceries@yourdomain`) with the action
+**Send to a Worker → household-hub-email**.
+
+Test the webhook directly with `curl` while `npm run preview` is running
+(local dev has no `EMAIL_WEBHOOK_SECRET`, so no header is needed):
 
     curl -X POST http://localhost:8788/api/webhooks/email \
       -H 'content-type: application/json' \
-      -d '{"from":"person-two@example.invalid","to":"groceries@example.invalid","body":"eggs"}'
+      -d '{"from":"north0401@gmail.com","to":"groceries@example.invalid","body":"eggs"}'
     # -> {"ok":true,"messageId":"..."}
 
 ## Replacing the fake household members

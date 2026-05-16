@@ -20,6 +20,14 @@ import { nowIso } from '$lib/server/time';
 export const POST: RequestHandler = async ({ platform, request }) => {
 	const db = requireDb(platform);
 
+	// When EMAIL_WEBHOOK_SECRET is configured, require the bridge Worker's
+	// shared-secret header; absent (local/dev) the check is skipped — the same
+	// pattern as Twilio signature validation on the SMS webhook.
+	const expectedSecret = platform!.env.EMAIL_WEBHOOK_SECRET;
+	if (expectedSecret && (request.headers.get('x-webhook-secret') ?? '') !== expectedSecret) {
+		return text('Invalid or missing webhook secret', { status: 403 });
+	}
+
 	const raw = (await request.json().catch(() => null)) as
 		| { from?: unknown; to?: unknown; body?: unknown; text?: unknown }
 		| null;

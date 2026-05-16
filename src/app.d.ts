@@ -21,6 +21,9 @@ declare global {
 				// email sends for real; when either is absent, it is stubbed.
 				RESEND_API_KEY?: string;
 				EMAIL_FROM?: string;
+				// Shared secret for the inbound-email bridge Worker. When set,
+				// POST /api/webhooks/email requires a matching X-Webhook-Secret.
+				EMAIL_WEBHOOK_SECRET?: string;
 			};
 		}
 	}
