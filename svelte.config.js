@@ -9,7 +9,17 @@ const config = {
 	kit: {
 		// Cloudflare Pages / Workers adapter. The app runs on the Cloudflare
 		// runtime; D1 and secrets reach route handlers via event.platform.env.
-		adapter: adapter()
+		adapter: adapter(),
+		csrf: {
+			// The Twilio inbound-SMS webhook (POST /api/webhooks/sms) is a
+			// cross-origin, form-encoded POST from api.twilio.com, which
+			// SvelteKit's default same-origin check rejects. The app's own
+			// writes use application/json — a content type that check never
+			// covered — so disabling it does not weaken them. The webhook's
+			// real protection is Twilio request-signature validation; see the
+			// TODO in src/routes/api/webhooks/sms/+server.ts.
+			checkOrigin: false
+		}
 	}
 };
 
