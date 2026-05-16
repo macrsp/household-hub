@@ -5,6 +5,11 @@
 		id: string;
 		display_name: string;
 	}
+	interface Conversation {
+		id: string;
+		name: string;
+		slug: string;
+	}
 	interface Message {
 		id: string;
 		body: string;
@@ -14,11 +19,11 @@
 		author_name: string;
 	}
 
-	// v1 has exactly one conversation; the slug is fixed.
-	const CONVERSATION = 'general';
 	const POLL_MS = 3000;
 
 	let people = $state<Person[]>([]);
+	let conversations = $state<Conversation[]>([]);
+	let activeSlug = $state('general');
 	let messages = $state<Message[]>([]);
 	let senderId = $state('');
 	let draft = $state('');
@@ -33,13 +38,27 @@
 			people = await res.json();
 			if (!senderId && people.length > 0) senderId = people[0].id;
 		} catch {
-			// transient — the 3s poll will recover
+			// transient — the poll recovers
+		}
+	}
+
+	async function loadConversations() {
+		try {
+			const res = await fetch('/api/conversations');
+			if (!res.ok) return;
+			conversations = await res.json();
+			// If the active slug is not among them, fall back to the first.
+			if (conversations.length > 0 && !conversations.some((c) => c.slug === activeSlug)) {
+				activeSlug = conversations[0].slug;
+			}
+		} catch {
+			// transient
 		}
 	}
 
 	async function loadMessages() {
 		try {
-			const res = await fetch(`/api/conversations/${CONVERSATION}/messages`);
+			const res = await fetch(`/api/conversations/${activeSlug}/messages`);
 			if (!res.ok) return;
 			const next: Message[] = await res.json();
 			const grew = next.length > messages.length;
@@ -49,8 +68,16 @@
 				listEl?.scrollTo({ top: listEl.scrollHeight });
 			}
 		} catch {
-			// transient — the 3s poll will recover
+			// transient
 		}
+	}
+
+	async function selectConversation(slug: string) {
+		if (slug === activeSlug) return;
+		activeSlug = slug;
+		messages = [];
+		errorText = '';
+		await loadMessages();
 	}
 
 	async function send() {
@@ -59,7 +86,7 @@
 		sending = true;
 		errorText = '';
 		try {
-			const res = await fetch(`/api/conversations/${CONVERSATION}/messages`, {
+			const res = await fetch(`/api/conversations/${activeSlug}/messages`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ authorPersonId: senderId, body })
@@ -96,6 +123,7 @@
 
 	onMount(() => {
 		loadPeople();
+		loadConversations();
 		loadMessages();
 		const timer = setInterval(loadMessages, POLL_MS);
 		return () => clearInterval(timer);
@@ -103,18 +131,30 @@
 </script>
 
 <svelte:head>
-	<title>Household Hub — General</title>
+	<title>Household Hub</title>
 </svelte:head>
 
 <main>
 	<header>
 		<h1>Household Hub</h1>
-		<p class="subtitle">#general · everyone in one thread, on whichever channel they prefer</p>
+		<nav class="conversations" aria-label="Conversations">
+			{#each conversations as conversation (conversation.id)}
+				<button
+					type="button"
+					class="conv-tab"
+					class:active={conversation.slug === activeSlug}
+					aria-current={conversation.slug === activeSlug ? 'true' : undefined}
+					onclick={() => selectConversation(conversation.slug)}
+				>
+					#{conversation.slug}
+				</button>
+			{/each}
+		</nav>
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite">
 		{#if messages.length === 0}
-			<p class="empty">No messages yet. Say hello below.</p>
+			<p class="empty">No messages in #{activeSlug} yet. Say hello below.</p>
 		{:else}
 			{#each messages as message (message.id)}
 				<article class="message">
@@ -148,7 +188,7 @@
 		</label>
 		<input
 			type="text"
-			placeholder="Message the household…"
+			placeholder="Message #{activeSlug}…"
 			bind:value={draft}
 			onkeydown={onKeydown}
 			autocomplete="off"
@@ -185,7 +225,7 @@
 	}
 
 	header {
-		padding: 1rem 1.25rem 0.75rem;
+		padding: 1rem 1.25rem 0.5rem;
 		border-bottom: 1px solid #e4e4e7;
 	}
 
@@ -194,10 +234,28 @@
 		font-size: 1.25rem;
 	}
 
-	.subtitle {
-		margin: 0.25rem 0 0;
+	.conversations {
+		display: flex;
+		gap: 0.4rem;
+		margin-top: 0.6rem;
+		flex-wrap: wrap;
+	}
+
+	.conv-tab {
+		font: inherit;
 		font-size: 0.8rem;
-		color: #71717a;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid #d4d4d8;
+		border-radius: 999px;
+		background: #ffffff;
+		color: #52525b;
+		cursor: pointer;
+	}
+
+	.conv-tab.active {
+		background: #2563eb;
+		border-color: #2563eb;
+		color: #ffffff;
 	}
 
 	.messages {
@@ -276,7 +334,7 @@
 		min-width: 0;
 	}
 
-	button {
+	.composer button {
 		background: #2563eb;
 		color: #ffffff;
 		border-color: #2563eb;
@@ -284,7 +342,7 @@
 		padding-inline: 1rem;
 	}
 
-	button:disabled {
+	.composer button:disabled {
 		background: #a1a1aa;
 		border-color: #a1a1aa;
 		cursor: not-allowed;

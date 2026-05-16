@@ -6,9 +6,11 @@
 -- is INSERT OR IGNORE, and the ids are fixed literals (production rows created
 -- at runtime use crypto.randomUUID() instead).
 
--- One conversation: the household `general` thread.
+-- Two conversations: the catch-all `general` thread and a `groceries` thread.
+-- An inbound SMS reaches `groceries` with a "#groceries " body prefix.
 INSERT OR IGNORE INTO conversations (id, name, slug, created_at) VALUES
-  ('conv-general', 'General', 'general', '2026-05-16T00:00:00.000Z');
+  ('conv-general', 'General', 'general', '2026-05-16T00:00:00.000Z'),
+  ('conv-groceries', 'Groceries', 'groceries', '2026-05-16T00:00:00.000Z');
 
 -- Three household members.
 INSERT OR IGNORE INTO people (id, display_name, created_at) VALUES
@@ -23,8 +25,11 @@ INSERT OR IGNORE INTO endpoints (id, person_id, type, address, verified_at, crea
   ('ep-two-sms', 'person-two', 'sms', '+15550000002', NULL, '2026-05-16T00:00:00.000Z'),
   ('ep-three-sms', 'person-three', 'sms', '+15550000003', NULL, '2026-05-16T00:00:00.000Z');
 
--- All three people participate in `general`.
+-- All three people participate in both conversations.
 INSERT OR IGNORE INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES
   ('conv-general', 'person-matt', 'all', 0),
   ('conv-general', 'person-two', 'all', 0),
-  ('conv-general', 'person-three', 'all', 0);
+  ('conv-general', 'person-three', 'all', 0),
+  ('conv-groceries', 'person-matt', 'all', 0),
+  ('conv-groceries', 'person-two', 'all', 0),
+  ('conv-groceries', 'person-three', 'all', 0);
