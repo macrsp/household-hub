@@ -16,3 +16,8 @@ TWILIO_FROM_NUMBER=
 # when either is blank/absent, email sending is stubbed.
 RESEND_API_KEY=
 EMAIL_FROM=
+
+# Shared secret for the inbound-email bridge Worker. When set, the
+# /api/webhooks/email endpoint requires a matching X-Webhook-Secret header.
+# Leave blank locally to accept unauthenticated curl tests.
+EMAIL_WEBHOOK_SECRET=

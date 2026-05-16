@@ -99,6 +99,15 @@ when each is reached.
   `EventSource` per conversation (sent messages added optimistically; the
   stream's echo de-dupes by id). Verified by curl: a message POSTed after the
   stream connected was pushed to it within ~1.5s. 38 unit tests pass.
+- [x] (2026-05-16) **M11 — Inbound email bridge Worker + webhook secret.**
+  `email-worker/` is a deployable Cloudflare Email Worker that MIME-parses
+  routed mail (`postal-mime`) and forwards `{from,to,body}` to
+  `POST /api/webhooks/email` with an `X-Webhook-Secret` header; the webhook
+  rejects a missing/wrong secret with 403 when `EMAIL_WEBHOOK_SECRET` is set,
+  skips the check when unset. `seed.sql` now seeds the real email endpoints
+  (north0401@gmail.com → Matt, macrsp@gmail.com → Person Two). Verified by
+  curl: no/wrong secret → 403, correct secret → 200; the email-worker builds
+  (`wrangler deploy --dry-run`). 38 unit tests pass.
 
 ## Surprises & Discoveries
 
@@ -311,6 +320,27 @@ subscription later needs no client change.
 
 This milestone touches no user-asset write path (the stream is read-only), so
 it carries no User-Asset Write-Path Checklist.
+
+**M11 — Inbound email bridge Worker + webhook secret.** M9 built the
+inbound-email webhook but Cloudflare Email Routing cannot POST to HTTP
+directly. M11 adds `email-worker/` — a separate, deployable Cloudflare Email
+Worker that receives routed mail, MIME-parses it with `postal-mime`, and
+forwards a clean `{ from, to, body }` payload to `POST /api/webhooks/email`
+with an `X-Webhook-Secret` header. The webhook gains a secret check: when
+`EMAIL_WEBHOOK_SECRET` is set it requires the header to match (403 otherwise),
+and skips the check when unset (local/dev) — the same pattern as the Twilio
+signature on the SMS webhook. `seed.sql` replaces the placeholder `email`
+endpoints with the real household addresses. The Worker is deployed and the
+shared secret set on both the Pages project and the Worker; the operator adds
+the Email Routing custom-address rules (`general@`, `groceries@`) pointing at
+the Worker.
+
+User-Asset Write-Path Checklist (M11): the touched user-asset class is
+`endpoints`, and only via `seed.sql` (the seed-only write path, as in v1 —
+real addresses replace placeholders). The email webhook's `messages` write
+path is unchanged from M9 (`insertMessage`). M11 adds one server gate — the
+`EMAIL_WEBHOOK_SECRET` header check — which only rejects requests; it does not
+touch a write. No new try/catch around a user-asset write is introduced.
 
 ## Concrete Steps
 

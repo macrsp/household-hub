@@ -18,14 +18,16 @@ INSERT OR IGNORE INTO people (id, display_name, created_at) VALUES
   ('person-two', 'Person Two', '2026-05-16T00:00:00.000Z'),
   ('person-three', 'Person Three', '2026-05-16T00:00:00.000Z');
 
--- One SMS endpoint per person, plus one example email endpoint. The numbers
--- and addresses are intentionally fake (the +1555 01xx range and the
--- .invalid TLD are reserved for fiction) — replace with real ones.
+-- One SMS endpoint per person (fake +1555 01xx numbers — reserved for
+-- fiction; swap for real ones), plus real email endpoints for the household
+-- members. An inbound email from one of these addresses is attributed to its
+-- person; the conversation is the address it was sent to (general@…).
 INSERT OR IGNORE INTO endpoints (id, person_id, type, address, verified_at, created_at) VALUES
   ('ep-matt-sms', 'person-matt', 'sms', '+15550000001', NULL, '2026-05-16T00:00:00.000Z'),
   ('ep-two-sms', 'person-two', 'sms', '+15550000002', NULL, '2026-05-16T00:00:00.000Z'),
   ('ep-three-sms', 'person-three', 'sms', '+15550000003', NULL, '2026-05-16T00:00:00.000Z'),
-  ('ep-two-email', 'person-two', 'email', 'person-two@example.invalid', NULL, '2026-05-16T00:00:00.000Z');
+  ('ep-matt-email', 'person-matt', 'email', 'north0401@gmail.com', NULL, '2026-05-16T00:00:00.000Z'),
+  ('ep-two-email', 'person-two', 'email', 'macrsp@gmail.com', NULL, '2026-05-16T00:00:00.000Z');
 
 -- All three people participate in both conversations.
 INSERT OR IGNORE INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES

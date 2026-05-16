@@ -1,0 +1,14 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "household-hub-email",
+	"main": "src/index.js",
+	"compatibility_date": "2026-05-16",
+
+	// The household-hub inbound-email webhook this Worker forwards to.
+	"vars": {
+		"WEBHOOK_URL": "https://household-hub.pages.dev/api/webhooks/email"
+	}
+
+	// EMAIL_WEBHOOK_SECRET is a secret, set with `wrangler secret put` — it
+	// must match the value on the household-hub Pages project.
+}
