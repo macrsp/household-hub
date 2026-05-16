@@ -1,144 +1,180 @@
-# Claude Code Project Instructions
+# Household Hub — Claude Project Context
 
-> **STUB — needs tailoring.** This file was seeded from the PracticePartner
-> CLAUDE.md and genericized for Comms (a Svelte/Node web app). Sections marked
-> `TODO:` must be filled in once the project structure exists — especially the
-> canonical branch bases, the test scripts, and any deploy/data sections.
+> Repo directory is `Comms`; the project/app name is `household-hub`.
 
-## Branch naming
+## Project summary
 
-When proposing, creating, or validating branch names for this repository, use
-this format exactly:
+`household-hub` is a small, trusted, household-scale communication relay. It
+lets household members talk to each other through whichever channel they
+prefer — web/PWA, SMS, and later email — without anyone having to use the same
+app.
 
-- `<type>/<branch-base>-<tailored-suffix>`
+This is **not** a scaled public SaaS product. It is a household tool. Manual
+setup is acceptable. Keep it boring and usable.
 
-Allowed `type` values:
+### The core architectural principle
 
-- `feat`
-- `fix`
-- `chore`
-- `refactor`
-- `docs`
-- `spike`
+> **The app owns the canonical conversation. SMS, email, and PWA are transport
+> adapters.**
 
-Allowed canonical `branch-base` values:
+- Do **not** treat SMS as the primary data model.
+- Do **not** try to emulate native group SMS or rely on carrier group-SMS
+  behavior.
+- Maintain canonical messages in the database (`messages` table) and fan them
+  out to each participant through their preferred endpoint.
+- Keep transport adapters (SMS, email, app) strictly separate from the
+  canonical message logic and fanout.
 
-> TODO: Replace these placeholders with the real architectural areas of Comms
-> once the structure is settled. In PracticePartner these were tier-0 elements
-> (runtime work topology) and experiences (user-facing surfaces). Pick the set
-> that matches Comms.
+      PWA/App  --->  canonical message hub  --->  SMS
+      SMS      --->  canonical message hub  --->  PWA/App
+      Email    --->  canonical message hub  --->  SMS / PWA/App
 
-- `app`
-- `ui`
-- `api`
-- `auth`
-- `data`
-- `infra`
+## Stack
 
-Rules:
+- SvelteKit + TypeScript
+- `@sveltejs/adapter-cloudflare`, Cloudflare Workers/Pages runtime
+- Cloudflare D1 for canonical relational data
+- Cloudflare Queues for async fanout **where it fits cleanly** — direct fanout
+  is acceptable for v1 if queue consumers are awkward in the SvelteKit
+  structure; document the tradeoff
+- `wrangler.jsonc` (not `wrangler.toml`) for Cloudflare config
+- Raw SQL or very thin DB helpers — **no heavyweight ORM**
+- No Docker
 
-- The actual branch base must be one of the canonical values above.
-- The tailored suffix must be lowercase kebab-case (`a-z`, `0-9`, `-` only).
-- The suffix must begin with an alphanumeric character.
-- Use the narrowest correct architectural owner as the branch base.
-- If a change spans multiple areas, choose the primary owner rather than
-  combining multiple bases.
-- Do not invent alternate branch formats: no spaces, underscores, uppercase
-  letters, or multiple slashes.
-- Do not create a branch until you have first stated the exact proposed branch
-  name.
+The user prefers **config-as-code**: checked-in migrations, scripts, and
+`wrangler.jsonc` over dashboard configuration. Wrangler is already
+authenticated.
 
-Required regex (update the base alternation to match the canonical list above):
+## v1 scope and non-goals
 
-- `^(feat|fix|chore|refactor|docs|spike)/(app|ui|api|auth|data|infra)-[a-z0-9]+(?:-[a-z0-9]+)*$`
+The first version is a minimal working relay: a canonical `general`
+conversation, a SvelteKit PWA that displays/sends messages and polls for new
+ones, an inbound Twilio-style SMS webhook, and outbound SMS fanout (stubbed
+when Twilio credentials are absent).
 
-When the working tree is on `main` and there are changes to land, do not pause
-to ask whether to create a branch. Announce the chosen name in passing — for
-visibility, so the user can course-correct — then create it and proceed.
+**Do not implement in v1** (the data model should leave room for these, but the
+code should not): auth/login, public signup, Durable Objects, WebSockets/
+realtime, inbound or outbound email, MMS/attachments, multi-household
+tenancy, admin dashboard, billing, native mobile app, full Twilio signature
+validation (TODO scaffolding only).
 
-When the working tree is already on a non-`main` branch, **do not suggest,
-propose, or create a new branch on your own initiative** — even if the next
-change feels topically unrelated. Default to staying on the current branch and
-adding the work there. The user explicitly decides when it is time to cut a new
-branch. Phrases like "let's branch" or "make a new branch" from the user are
-the only valid trigger. When the user asks for a new branch while you are on a
-non-`main` branch, return to `main` first (`git switch main && git pull
---ff-only`), then create the new branch from `main`. Do not stack feature
-branches on top of other feature branches.
+When a v1 feature would benefit from one of these later, leave a `TODO:`
+comment rather than building it now.
 
-When the user asks for a branch name, return:
+## Coding preferences
 
-- proposed branch name
-- selected type
-- selected canonical branch base
-- selected suffix
-- one-sentence rationale for why that base is the primary owner
-
-## Node and test workflow
-
-> TODO: These scripts do not exist yet. Add them to `package.json` and adjust
-> the commands here once the toolchain is in place.
-
-- Start in the repository root.
-- Use `npm run test:unit` for unit tests (Vitest).
-- Use `npm run test:e2e` for end-to-end tests (Playwright).
-- Do not use `npx vitest` or raw `playwright test` directly unless intentionally
-  debugging the underlying command.
-- **Run `npm run test:e2e` before pushing whenever a change touches code**
-  (`.ts`, `.svelte`, `.css`, route files, or anything affecting the rendered
-  DOM or runtime behavior). Type-checking and unit tests cover correctness in
-  isolation; E2E covers surface contracts (CSS class names, page structure,
-  navigation, click paths) that no other gate catches.
-
-## Committing and pushing
-
-This repo uses a **make changes → run gates → commit → push** handoff, done in
-one turn without waiting for permission at each step.
-
-- When you finish a change on a non-`main` feature branch and the relevant
-  gates are green (typecheck, unit tests, and E2E when the change touches
-  code), commit the work and push it — do not wait to be asked.
-- Stage only the files relevant to the change (`git add <paths>`), not
-  `git add -A` / `git add .`.
-- After creating a commit, push it in the same turn (`git push`, or
-  `git push -u origin <branch>` for a brand-new branch).
-- Never push to `main` directly, and never force-push a shared branch without
-  an explicit request.
-- If a pre-commit or pre-push hook fails, fix the underlying issue and create a
-  new commit; do not bypass with `--no-verify`.
-- Do *not* auto-commit-and-push when: gates are red; the user said "don't
-  commit yet" / "let me review first"; the change is on `main`; or the work is
-  genuinely incomplete.
-
-## Pull requests and CI
-
-- After pushing a feature branch, open a PR against `main` if one does not
-  already exist (`gh pr create ...`) and monitor CI to completion. A remote
-  branch without a PR is invisible to reviewers and CI gating.
-- Poll `gh pr checks <num>` with `Bash` until every required check is `pass`,
-  `skipping`, or `fail` (no `pending`/`queued`).
-- If a check fails, surface the failing job's name and log link to the user
-  before deciding next steps; do not silently retry.
-- Only merge once every required check is green AND the user has authorized the
-  merge.
+- Prefer boring, explicit code over clever abstractions. Keep files small.
+- TypeScript types for Cloudflare bindings.
+- `crypto.randomUUID()` for IDs; ISO 8601 strings for timestamps.
+- Raw SQL or tiny helper functions; validate all request bodies; return clear,
+  typed errors.
+- Keep transport adapters separate from canonical message logic.
+- Do not introduce unnecessary dependencies.
+- Add `TODO:` comments where later production hardening is needed.
+- Do not commit secrets. Twilio secrets (`TWILIO_ACCOUNT_SID`,
+  `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`) go through `wrangler secret put`;
+  keep a `.dev.vars.example` checked in.
+- Do not claim something works unless it was actually checked (`npm run check`,
+  `npm run build`, and any tests).
 
 ## ExecPlans
 
-This repo follows the ExecPlan discipline. The requirements for writing and
-maintaining execution plans live in [`.agent/PLANS.md`](.agent/PLANS.md). Read
-that file before authoring or implementing an ExecPlan.
+This repo follows the ExecPlan discipline — the requirements for writing and
+maintaining execution plans are in [`.agent/PLANS.md`](.agent/PLANS.md). Read
+it before authoring or implementing a plan.
 
-> TODO: PLANS.md includes `## User-Asset Durability` invariants and a
-> Write-Path Checklist that assume a persistent datastore with a documented
-> user-asset manifest. Once Comms has a data layer, document the canonical
-> user-asset record list (e.g. in a `cloudflare/d1/README.md` or equivalent)
-> and link it here. If Comms never persists user data, trim those sections
-> from PLANS.md.
+The detailed v1 build spec — D1 schema (`people`, `endpoints`, `conversations`,
+`participants`, `messages`, `deliveries`), seed data, API routes, fanout
+helper, and Cloudflare/Twilio setup — belongs in an ExecPlan under `.agent/`,
+not in this file. CLAUDE.md holds durable context and conventions; the plan
+holds the step-by-step.
 
-## Repository discipline
+PLANS.md includes a `## User-Asset Durability` section and a Write-Path
+Checklist. `messages`, `people`, `endpoints`, `conversations`, `participants`,
+and `deliveries` are user-asset record classes — any plan touching their write
+paths must follow those invariants. Document the canonical user-asset manifest
+in the D1 schema docs once they exist, and link it here.
 
-- Keep repo-level guardrails simple and explicit.
-- Prefer deterministic enforcement for Git and branch policy.
+## Branch naming
 
-> TODO: Document the architectural model of record for Comms (its elements and
-> surfaces) once it exists, and keep this file in sync with it.
+Use this format exactly: `<type>/<branch-base>-<tailored-suffix>`
+
+`type`: `feat` · `fix` · `chore` · `refactor` · `docs` · `spike`
+
+Canonical `branch-base` values (the architectural areas of household-hub —
+adjust as the structure settles):
+
+- `hub` — canonical message store, conversations, fanout orchestration
+- `sms` — SMS transport adapter (inbound webhook, outbound send)
+- `email` — email transport adapter (future)
+- `pwa` — SvelteKit frontend / UI
+- `api` — SvelteKit server route handlers
+- `db` — D1 schema, migrations, seed data
+- `infra` — `wrangler.jsonc`, Cloudflare config, Queues setup
+
+Rules:
+
+- The branch base must be one of the canonical values above.
+- The suffix is lowercase kebab-case (`a-z`, `0-9`, `-`), starting with an
+  alphanumeric.
+- Use the narrowest correct architectural owner. If a change spans areas,
+  choose the primary owner — do not combine bases.
+- No spaces, underscores, uppercase, or multiple slashes.
+- State the exact proposed branch name before creating it.
+
+Regex (keep the base alternation in sync with the list above):
+
+- `^(feat|fix|chore|refactor|docs|spike)/(hub|sms|email|pwa|api|db|infra)-[a-z0-9]+(?:-[a-z0-9]+)*$`
+
+When on `main` with changes to land, do not pause to ask whether to branch —
+announce the chosen name in passing, create it, and proceed. When already on a
+non-`main` branch, **do not propose or create a new branch on your own
+initiative**; default to staying on the current branch. The user explicitly
+decides when to cut a new branch ("let's branch" / "make a new branch"). When
+asked for a new branch while on a non-`main` branch, return to `main` first
+(`git switch main && git pull --ff-only`), then branch from `main`. Do not
+stack feature branches on other feature branches.
+
+When asked for a branch name, return: proposed name, type, canonical base,
+suffix, and a one-sentence rationale for why that base is the primary owner.
+
+## Build and verification workflow
+
+- Start in the repository root.
+- `npm run check` — `svelte-kit sync` + `svelte-check`. The typecheck gate.
+- `npm run build` — production build. Must pass before pushing.
+- `npm run db:migrate:local` / `db:migrate:remote` — apply D1 migrations.
+- `npm run db:seed:local` / `db:seed:remote` — load `seed.sql`.
+- Run any tests that exist before pushing a code change.
+- Cloudflare D1 changes go through checked-in migration files in `migrations/`,
+  never ad-hoc `wrangler d1 execute` against remote. Apply to `--local` first,
+  then `--remote`.
+
+## Committing and pushing
+
+Handoff is **make changes → run gates → commit → push**, in one turn without
+waiting for permission at each step.
+
+- When a change on a non-`main` feature branch is complete and gates are green
+  (`npm run check`, `npm run build`, tests), commit and push it — do not wait
+  to be asked.
+- Stage only the files relevant to the change (`git add <paths>`), never
+  `git add -A` / `git add .`.
+- Push in the same turn as the commit (`git push`, or `git push -u origin
+  <branch>` for a new branch).
+- Never push to `main` directly; never force-push a shared branch without an
+  explicit request.
+- If a pre-commit/pre-push hook fails, fix the cause and make a new commit — do
+  not bypass with `--no-verify`.
+- Do **not** auto-commit-and-push when: gates are red; the user said "don't
+  commit yet"; the change is on `main`; or the work is genuinely incomplete.
+
+## Pull requests and CI
+
+- After pushing a feature branch, open a PR against `main` if none exists
+  (`gh pr create`) and monitor CI to completion.
+- Poll `gh pr checks <num>` with `Bash` until every required check is `pass`,
+  `skipping`, or `fail` (no `pending`/`queued`).
+- If a check fails, surface the failing job's name and log link before deciding
+  next steps; do not silently retry.
+- Only merge once every required check is green AND the user has authorized it.
