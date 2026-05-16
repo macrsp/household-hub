@@ -123,6 +123,44 @@ known seeded number is accepted, an unknown number is rejected:
 The accepted message then appears at `http://localhost:8788/` within the
 3-second poll.
 
+## Inbound email setup
+
+`POST /api/webhooks/email` ingests inbound email as a JSON payload
+(`{ "from": "...", "to": "...", "body": "..." }`). The sender is mapped to a
+household member by a registered `email` endpoint; the conversation is the
+local part of the `to` address (`general@…`, `groceries@…`), falling back to
+`general`.
+
+Cloudflare Email Routing cannot POST to an HTTP endpoint directly, so a small
+**Email Worker** forwards the parsed message. Configure Email Routing for your
+domain, route the household addresses to this Worker, and deploy it separately:
+
+    export default {
+      async email(message, env, ctx) {
+        const chunks = [];
+        for await (const chunk of message.raw) chunks.push(chunk);
+        const body = new TextDecoder().decode(
+          chunks.reduce((a, c) => new Uint8Array([...a, ...c]), new Uint8Array())
+        );
+        await fetch('https://household-hub.pages.dev/api/webhooks/email', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ from: message.from, to: message.to, body })
+        });
+      }
+    };
+
+(For production, parse the MIME body rather than forwarding the raw message,
+and add a shared-secret header the webhook checks — analogous to the Twilio
+signature on the SMS webhook.)
+
+Test the webhook directly with `curl` while `npm run preview` is running:
+
+    curl -X POST http://localhost:8788/api/webhooks/email \
+      -H 'content-type: application/json' \
+      -d '{"from":"person-two@example.invalid","to":"groceries@example.invalid","body":"eggs"}'
+    # -> {"ok":true,"messageId":"..."}
+
 ## Replacing the fake household members
 
 [`seed.sql`](seed.sql) defines three people with obviously fake `+1555…`

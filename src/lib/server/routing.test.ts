@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseConversationPrefix } from './routing';
+import { parseConversationPrefix, conversationSlugFromEmailAddress } from './routing';
 
 describe('parseConversationPrefix', () => {
 	it('extracts a #slug prefix and strips it from the body', () => {
@@ -42,5 +42,27 @@ describe('parseConversationPrefix', () => {
 			slug: 'weekend-trip',
 			body: 'who is driving'
 		});
+	});
+});
+
+describe('conversationSlugFromEmailAddress', () => {
+	it('takes the local part as the slug', () => {
+		expect(conversationSlugFromEmailAddress('groceries@household.example')).toBe('groceries');
+	});
+
+	it('lowercases', () => {
+		expect(conversationSlugFromEmailAddress('General@household.example')).toBe('general');
+	});
+
+	it('strips plus-addressing', () => {
+		expect(conversationSlugFromEmailAddress('groceries+matt@household.example')).toBe('groceries');
+	});
+
+	it('accepts hyphenated slugs', () => {
+		expect(conversationSlugFromEmailAddress('weekend-trip@household.example')).toBe('weekend-trip');
+	});
+
+	it('returns null for a local part that is not a valid slug', () => {
+		expect(conversationSlugFromEmailAddress('.bad@household.example')).toBeNull();
 	});
 });

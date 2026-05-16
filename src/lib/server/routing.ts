@@ -22,3 +22,14 @@ export function parseConversationPrefix(raw: string): ParsedRoute {
 	if (!m) return { slug: null, body: raw };
 	return { slug: m[1].toLowerCase(), body: m[2].trim() };
 }
+
+// Inbound email names its target conversation by the address it was sent to:
+// the local part (before `@`) is the conversation slug. Plus-addressing is
+// stripped, so `groceries+anything@household.example` still routes to
+// `groceries`. Returns null when the local part is not a valid slug.
+const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+
+export function conversationSlugFromEmailAddress(addr: string): string | null {
+	const local = addr.trim().toLowerCase().split('@')[0].split('+')[0];
+	return SLUG.test(local) ? local : null;
+}
