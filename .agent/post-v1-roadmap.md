@@ -84,9 +84,14 @@ when each is reached.
   well as `sms`. `seed.sql` adds an example `email` endpoint. Verified by
   curl: a recipient with both sms and email endpoints received one
   `deliveries` row per transport (both `sent_stubbed`). 33 unit tests pass.
-- [ ] **M9 — Inbound email.** Email → canonical message, via stable
-  per-conversation addresses. (Feature — touches `messages` / `endpoints`
-  writes.)
+- [x] (2026-05-16) **M9 — Inbound email.** `POST /api/webhooks/email` ingests
+  an inbound email JSON payload — maps the `from` address to a household
+  member, routes by the `to` address's local part to a conversation
+  (`conversationSlugFromEmailAddress` in `routing.ts`, plus-addressing
+  stripped), stores a `source_transport='email'` message, and fans out.
+  `README.md` documents the Cloudflare Email Routing → Email Worker glue.
+  Verified by curl: routed to groceries / general by the to-address; unknown
+  sender → 403. 38 unit tests pass (5 new routing tests).
 - [ ] **M10 — Realtime delivery.** Replace the 3-second poll with server push
   (Server-Sent Events or a Durable Object).
 
@@ -253,9 +258,25 @@ helpers in `db.ts`; M8 only uses `email`, an existing member of
 unchanged (one catch around each send, recording the outcome on the delivery
 row). `email.test.ts` covers the stub path. No new try/catch is introduced.
 
-**M9–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
-milestone spec (purpose, files, steps, acceptance, and a User-Asset Write-Path
-Checklist where it writes user-asset records) when it is reached.
+**M9 — Inbound email.** `POST /api/webhooks/email` accepts an inbound email as
+a JSON payload (`{ from, to, body }`) — the inbound counterpart of the SMS
+webhook. It maps `from` to a household member via an `email` endpoint, routes
+by the `to` address's local part (`conversationSlugFromEmailAddress` in
+`routing.ts`), stores a `source_transport='email'` message, and fans out.
+Cloudflare Email Routing cannot POST to HTTP directly, so `README.md`
+documents a small Email Worker that forwards the parsed message here.
+
+User-Asset Write-Path Checklist (M9): the touched class is `messages`. The
+write path is the existing `insertMessage` helper; `source_transport='email'`
+is an existing `SOURCE_TRANSPORTS` / schema-`CHECK` value. The server gate is
+the webhook handler — unknown sender → 403, empty body → 400.
+`routing.test.ts` covers `conversationSlugFromEmailAddress`. The one try/catch
+around the `fanoutMessage` call is the established webhook-fanout pattern (as
+in the SMS webhook): the message write has already succeeded, so logging a
+fanout failure is not a silent fallback on a user-asset write.
+
+**M10 — feature.** Sketched in `Progress`; fleshed out into a full milestone
+spec when reached.
 
 ## Concrete Steps
 
