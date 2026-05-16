@@ -47,9 +47,14 @@ when each is reached.
   repository secret is added (a deliberate operator decision — a no-expiration
   account-wide token in CI was not auto-stored); it skips with a notice until
   then. PLANS.md User-Asset Durability invariant 4.
-- [ ] **M4 — Twilio request-signature validation.** Replace the `TODO` in the
-  SMS webhook with real `X-Twilio-Signature` HMAC-SHA1 verification against
-  `TWILIO_AUTH_TOKEN`.
+- [x] (2026-05-16) **M4 — Twilio request-signature validation.**
+  `verifyTwilioSignature` in `src/lib/server/sms.ts` recomputes Twilio's
+  HMAC-SHA1 signature (URL + sorted params) and constant-time-compares it to
+  `X-Twilio-Signature`. The SMS webhook rejects a bad or absent signature with
+  `403` when `TWILIO_AUTH_TOKEN` is set, and skips validation when it is
+  absent (local/dev). `src/lib/server/sms.test.ts` pins the algorithm against
+  a cross-checked vector. Verified: 20 unit tests pass; webhook still
+  `200`/`403` with no token configured.
 - [ ] **M5 — CSRF hardening.** Resolve the deprecated `kit.csrf.checkOrigin =
   false`: determine the inbound webhook's real cross-origin shape and move to
   the narrowest correct `kit.csrf.trustedOrigins` configuration.
@@ -84,6 +89,13 @@ when each is reached.
   Evidence: a deploy from `chore/infra-nodejs-compat` produced the alias
   `chore-infra-nodejs-compat.household-hub.pages.dev`, not the production
   `household-hub.pages.dev`.
+
+- Observation: changing `wrangler.jsonc`'s `database_id` repoints local D1.
+  `wrangler ... --local` and `wrangler pages dev` key their local SQLite state
+  by the configured database, so after the placeholder id became the real id
+  the local database was a fresh, empty one — the webhook 500'd with `no such
+  table: endpoints` until `db:migrate:local` + `db:seed:local` were re-run.
+  Evidence: `D1_ERROR: no such table: endpoints` during M4 local verification.
 
 ## Decision Log
 

@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
 import { insertMessage, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
+import { verifyTwilioSignature } from '$lib/server/sms';
 import { nowIso } from '$lib/server/time';
 
 // Empty TwiML document — the response Twilio expects when an inbound SMS was
@@ -16,15 +17,33 @@ const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>
 // carrier text message into one canonical message and hands off to the
 // shared fanout helper. It does not emulate group SMS.
 //
-// TODO: validate Twilio's `X-Twilio-Signature` header against
-// TWILIO_AUTH_TOKEN before trusting the body. v1 omits this — the webhook
-// URL is the only secret. Production hardening, not a v1 goal.
+// When TWILIO_AUTH_TOKEN is configured, the request's `X-Twilio-Signature`
+// is verified before the body is trusted. Without the token (local/dev)
+// there is nothing to verify against, so validation is skipped.
 export const POST: RequestHandler = async ({ platform, request }) => {
 	const db = requireDb(platform);
 
 	const form = await request.formData();
-	const from = String(form.get('From') ?? '').trim();
-	const body = String(form.get('Body') ?? '').trim();
+	// Twilio signs over every POST parameter, so collect them all.
+	const params: Record<string, string> = {};
+	for (const [k, v] of form) {
+		if (typeof v === 'string') params[k] = v;
+	}
+
+	// Verify the Twilio request signature when an auth token is configured.
+	const authToken = platform!.env.TWILIO_AUTH_TOKEN;
+	if (authToken) {
+		const signature = request.headers.get('X-Twilio-Signature') ?? '';
+		const ok =
+			signature !== '' &&
+			(await verifyTwilioSignature(authToken, request.url, params, signature));
+		if (!ok) {
+			return text('Invalid Twilio request signature', { status: 403 });
+		}
+	}
+
+	const from = (params.From ?? '').trim();
+	const body = (params.Body ?? '').trim();
 	if (from === '' || body === '') {
 		return text('Expected Twilio form fields From and Body', { status: 400 });
 	}
