@@ -62,9 +62,13 @@ when each is reached.
   cannot admit it — `checkOrigin: false` is the only working setting and must
   stay. `svelte.config.js` and `README.md` now document this definitively so
   the deprecation is not naively "fixed" in a way that breaks the webhook.
-- [ ] **M6 — Multiple conversations.** Inbound-SMS routing to a conversation
-  other than `general`, and a conversation switcher in the PWA. (Feature —
-  flesh out when reached; touches `messages` writes.)
+- [x] (2026-05-16) **M6 — Multiple conversations.** `seed.sql` adds a
+  `groceries` conversation; `src/lib/server/routing.ts` parses a `#slug `
+  prefix; the SMS webhook routes a prefixed message to that conversation when
+  the sender participates (else `general`, message intact); `+page.svelte`
+  has a conversation-tab switcher. Verified by curl: `#groceries need milk` →
+  groceries thread (prefix stripped); plain SMS → general; `#nosuchconv` →
+  general with the text intact. 26 unit tests pass (6 new routing tests).
 - [ ] **M7 — Notification preferences.** Honor `participants.delivery_preference`
   and `participants.muted` in fanout, with a small UI to set them. (Feature —
   touches `participants` writes.)
@@ -179,7 +183,34 @@ unit-test the signing function against a known vector.
 sends, then move from the deprecated `kit.csrf.checkOrigin = false` to the
 narrowest correct `kit.csrf.trustedOrigins`, keeping the webhook reachable.
 
-**M6–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
+**M6 — Multiple conversations.** The schema already supports many
+conversations (`conversations`, `participants`); v1 seeds and assumes only
+`general`. M6 makes the relay genuinely multi-conversation:
+
+- `seed.sql` gains a second conversation, `groceries`, with all three people
+  as participants — so there is a thread to switch to.
+- `src/lib/server/routing.ts` adds `parseConversationPrefix(body)`: an inbound
+  SMS whose body begins with `#<slug> ` names a target conversation; the
+  prefix is routing metadata and is stripped from the stored message body.
+- `POST /api/webhooks/sms` routes via that prefix — to the named conversation
+  when it exists and the sender participates in it, otherwise to `general`
+  (an unrecognised prefix never loses a message).
+- `src/routes/+page.svelte` gains a conversation switcher: it loads
+  `/api/conversations`, shows a selector, and reads/sends/polls against the
+  active conversation. The per-slug API routes already exist (M2), so no API
+  change is needed.
+
+User-Asset Write-Path Checklist (M6): the only user-asset write path touched
+is `messages` — the webhook still inserts exactly one message per inbound SMS
+via `insertMessage` (`src/lib/server/db.ts`); M6 only changes which
+`conversation_id` it carries. The gate is unchanged: `conversation_id` is
+resolved from a `conversations` row that must exist, and the existing
+`messages` `CHECK`/typed-insert still apply. `seed.sql` adds `conversations`
+and `participants` rows (seed-only write path, as in v1). A unit test in
+`src/lib/server/routing.test.ts` covers `parseConversationPrefix`. No new
+try/catch around a user-asset write is introduced.
+
+**M7–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
 milestone spec (purpose, files, steps, acceptance, and a User-Asset Write-Path
 Checklist where it writes user-asset records) when it is reached.
 

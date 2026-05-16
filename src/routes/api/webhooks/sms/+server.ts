@@ -4,6 +4,7 @@ import { requireDb } from '$lib/server/platform';
 import { insertMessage, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
 import { verifyTwilioSignature } from '$lib/server/sms';
+import { parseConversationPrefix } from '$lib/server/routing';
 import { nowIso } from '$lib/server/time';
 
 // Empty TwiML document — the response Twilio expects when an inbound SMS was
@@ -43,8 +44,8 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 	}
 
 	const from = (params.From ?? '').trim();
-	const body = (params.Body ?? '').trim();
-	if (from === '' || body === '') {
+	const rawBody = (params.Body ?? '').trim();
+	if (from === '' || rawBody === '') {
 		return text('Expected Twilio form fields From and Body', { status: 400 });
 	}
 
@@ -59,19 +60,42 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 			status: 403
 		});
 	}
+	const personId = endpoint.person_id;
 
-	// v1 routes every inbound SMS to the `general` conversation.
-	const conversation = await db
-		.prepare("SELECT id FROM conversations WHERE slug = 'general'")
-		.first<{ id: string }>();
-	if (!conversation) {
-		return text('The `general` conversation is missing — run the seed.', { status: 500 });
+	// Route by an optional "#slug" prefix. A prefix naming a conversation the
+	// sender participates in routes the message there (prefix stripped);
+	// anything else falls back to `general` with the message left intact.
+	const route = parseConversationPrefix(rawBody);
+	let conversationId: string | null = null;
+	let body = rawBody;
+	if (route.slug) {
+		const target = await db
+			.prepare(
+				`SELECT c.id AS id FROM conversations c
+				 JOIN participants p ON p.conversation_id = c.id
+				 WHERE c.slug = ? AND p.person_id = ?`
+			)
+			.bind(route.slug, personId)
+			.first<{ id: string }>();
+		if (target) {
+			conversationId = target.id;
+			body = route.body;
+		}
+	}
+	if (!conversationId) {
+		const general = await db
+			.prepare("SELECT id FROM conversations WHERE slug = 'general'")
+			.first<{ id: string }>();
+		if (!general) {
+			return text('The `general` conversation is missing — run the seed.', { status: 500 });
+		}
+		conversationId = general.id;
 	}
 
 	const message: Message = {
 		id: crypto.randomUUID(),
-		conversation_id: conversation.id,
-		author_person_id: endpoint.person_id,
+		conversation_id: conversationId,
+		author_person_id: personId,
 		body,
 		source_transport: 'sms',
 		created_at: nowIso()
