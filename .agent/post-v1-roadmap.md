@@ -77,8 +77,13 @@ when each is reached.
   a mute toggle and delivery selector for the active sender. Verified by curl:
   an `app_only` recipient received no `deliveries` row; a bad
   `delivery_preference` → 400. 30 unit tests pass.
-- [ ] **M8 — Outbound email transport adapter.** Deliver fanout to `email`
-  endpoints via an email-sending API. (Feature — touches `deliveries` writes.)
+- [x] (2026-05-16) **M8 — Outbound email transport adapter.**
+  `src/lib/server/email.ts` — `sendEmail()`, the email counterpart of
+  `sms.ts`: posts to the Resend REST API when `RESEND_API_KEY` + `EMAIL_FROM`
+  are set, stubs otherwise. `fanout.ts` now delivers to `email` endpoints as
+  well as `sms`. `seed.sql` adds an example `email` endpoint. Verified by
+  curl: a recipient with both sms and email endpoints received one
+  `deliveries` row per transport (both `sent_stubbed`). 33 unit tests pass.
 - [ ] **M9 — Inbound email.** Email → canonical message, via stable
   per-conversation addresses. (Feature — touches `messages` / `endpoints`
   writes.)
@@ -233,7 +238,22 @@ The declared set lives once in `src/lib/preferences.ts`, enumerated by
 `src/lib/preferences.test.ts`. No new try/catch around a user-asset write is
 introduced.
 
-**M8–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
+**M8 — Outbound email transport adapter.** `src/lib/server/email.ts` —
+`sendEmail()`, the email counterpart of `sms.ts`: posts to the Resend REST API
+when `RESEND_API_KEY` and `EMAIL_FROM` are set, stubs otherwise. `fanout.ts`
+delivers to `email` endpoints as well as `sms` (still skipping `app` endpoints
+and `app_only` recipients), writing one `deliveries` row per endpoint with the
+correct `transport`. `seed.sql` adds an example `email` endpoint; `app.d.ts`
+and `.dev.vars.example` carry the two new secrets.
+
+User-Asset Write-Path Checklist (M8): the touched class is `deliveries`. The
+write path is unchanged — the same `insertDelivery` / `updateDeliveryStatus`
+helpers in `db.ts`; M8 only uses `email`, an existing member of
+`DELIVERY_TRANSPORTS` and the schema `CHECK`. The per-iteration try/catch is
+unchanged (one catch around each send, recording the outcome on the delivery
+row). `email.test.ts` covers the stub path. No new try/catch is introduced.
+
+**M9–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
 milestone spec (purpose, files, steps, acceptance, and a User-Asset Write-Path
 Checklist where it writes user-asset records) when it is reached.
 

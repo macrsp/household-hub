@@ -8,6 +8,7 @@
 
 import { insertDelivery, updateDeliveryStatus, type DeliveryRow } from './db';
 import { sendSms } from './sms';
+import { sendEmail } from './email';
 import { nowIso } from './time';
 
 type Env = App.Platform['env'];
@@ -62,14 +63,14 @@ export async function fanoutMessage(
 			.all<EndpointRow>();
 
 		for (const endpoint of endpoints) {
-			// v1 has exactly one outbound adapter: SMS. `email` and `app`
-			// endpoint types are stored for the future but have no push
-			// transport yet (the web app reads by polling), so they get no
+			// v1.x has two outbound adapters, SMS and email. `app` endpoints
+			// have no push transport (the web app polls), so they get no
 			// delivery row — every `deliveries` row is a real send attempt.
-			if (endpoint.type !== 'sms') continue;
-			// `app_only` recipients stay in the conversation but are not
-			// texted — they read via the polling web app.
+			if (endpoint.type !== 'sms' && endpoint.type !== 'email') continue;
+			// `app_only` recipients stay in the conversation but receive no
+			// push delivery — they read via the polling web app.
 			if (recipient.delivery_preference === 'app_only') continue;
+			const transport = endpoint.type as 'sms' | 'email';
 
 			const deliveryId = crypto.randomUUID();
 			const ts = nowIso();
@@ -77,7 +78,7 @@ export async function fanoutMessage(
 				id: deliveryId,
 				message_id: message.id,
 				endpoint_id: endpoint.id,
-				transport: 'sms',
+				transport,
 				provider_message_id: null,
 				status: 'pending',
 				error: null,
@@ -87,11 +88,11 @@ export async function fanoutMessage(
 			await insertDelivery(db, delivery);
 
 			try {
-				const result = await sendSms(
-					env,
-					endpoint.address,
-					`[${authorName}]: ${message.body}`
-				);
+				const line = `[${authorName}]: ${message.body}`;
+				const result =
+					transport === 'sms'
+						? await sendSms(env, endpoint.address, line)
+						: await sendEmail(env, endpoint.address, `New message from ${authorName}`, line);
 				if (result.kind === 'sent') {
 					await updateDeliveryStatus(db, deliveryId, 'sent', {
 						provider_message_id: result.providerMessageId ?? undefined
