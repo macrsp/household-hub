@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
 import { insertMessage, type Message } from '$lib/server/db';
+import { fanoutMessage } from '$lib/server/fanout';
 import { nowIso } from '$lib/server/time';
 
 // Resolve a conversation row id from its URL slug, or 404.
@@ -72,7 +73,14 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 	};
 	await insertMessage(db, message);
 
-	// TODO(M3): trigger fanout here — fanoutMessage(db, platform.env, message.id)
+	// Fan the canonical message out to the other participants. The message is
+	// already stored; a fanout failure is logged but does not fail this
+	// response, and per-delivery outcomes are recorded on `deliveries` rows.
+	try {
+		await fanoutMessage(db, platform!.env, message.id);
+	} catch (e) {
+		console.error('[fanout] failed for message', message.id, e);
+	}
 
 	return json(message, { status: 201 });
 };

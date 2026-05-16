@@ -17,7 +17,7 @@ You can see it working at the end: with the development server running, loading 
 - [x] (2026-05-16) ExecPlan authored from the v1 build specification and `.agent/PLANS.md`.
 - [x] (2026-05-16) Milestone 1 — SvelteKit + Cloudflare scaffold, D1 schema, seed data, health route. `npm run check` clean (0 errors, 0 warnings), `npm run build` green via `@sveltejs/adapter-cloudflare`, local D1 migrated + seeded (people 3, endpoints 3, conversations 1, participants 3), `GET /api/health` returns `{"ok":true}` with HTTP 200.
 - [x] (2026-05-16) Milestone 2 — Canonical message store and the app-transport read/write API. `GET /api/people`, `GET /api/conversations`, `GET /api/conversations/[slug]/messages` (oldest-first, author name joined), and `POST .../messages` (validates body + author, stores `source_transport='app'`). Verified by curl: valid POST → 201; empty body and unknown author → 400; unknown conversation → 404; posted message returned by GET with `author_name`.
-- [ ] Milestone 3 — Fanout helper and the outbound SMS adapter (stubbed without Twilio credentials).
+- [x] (2026-05-16) Milestone 3 — Fanout helper and the outbound SMS adapter (stubbed without Twilio credentials). `src/lib/server/sms.ts` (`sendSms`, stub when secrets absent), `src/lib/server/fanout.ts` (`fanoutMessage`, author + muted skipped, per-iteration try/catch), wired into the app POST route. 16 unit tests pass (transport-set ⇄ schema parity, SMS stub mode). Verified by curl: POST as Matt → exactly 2 `deliveries` rows (Person Two, Person Three — author skipped), both `sent_stubbed`.
 - [ ] Milestone 4 — Inbound SMS webhook.
 - [ ] Milestone 5 — The PWA front-end page.
 - [ ] Final verification — `npm run check`, `npm run build`, seed + curl acceptance transcript, README complete.
@@ -57,6 +57,10 @@ Use timestamps on every entry as work proceeds, and split any partially complete
 - Decision: re-open the earlier "OAuth for now" Cloudflare-auth choice — automated/remote `wrangler` work in this repo needs a `CLOUDFLARE_API_TOKEN`, not OAuth.
   Rationale: OAuth refresh requires an interactive browser flow a non-interactive agent cannot perform. This does not block local development or milestones 1–5's local acceptance, but it does block `wrangler d1 create`, `db:migrate:remote`, and `deploy`. A scoped API token is a prerequisite for the first remote deploy; recorded as a follow-up in the README.
   Date/Author: 2026-05-16 / M1 implementer.
+
+- Decision: v1 fanout writes a `deliveries` row only for `sms` endpoints; `email` and `app` endpoint types are skipped with no row.
+  Rationale: v1 has exactly one outbound adapter (SMS). The web app receives messages by polling the GET route, not by a pushed delivery, and email is a v1 non-goal. Writing a row only when a real send is attempted keeps every `deliveries` row meaningful. The v1 seed has only `sms` endpoints, so seeded-data behavior is unaffected; an email adapter later adds its own branch in `fanout.ts`.
+  Date/Author: 2026-05-16 / M3 implementer.
 
 ## Outcomes & Retrospective
 
