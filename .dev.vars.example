@@ -11,3 +11,8 @@
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_FROM_NUMBER=
+
+# Email (Resend). When both are set, outbound email sends for real;
+# when either is blank/absent, email sending is stubbed.
+RESEND_API_KEY=
+EMAIL_FROM=

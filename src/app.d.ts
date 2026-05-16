@@ -17,6 +17,10 @@ declare global {
 				TWILIO_ACCOUNT_SID?: string;
 				TWILIO_AUTH_TOKEN?: string;
 				TWILIO_FROM_NUMBER?: string;
+				// Email (Resend) credentials. When both are present, outbound
+				// email sends for real; when either is absent, it is stubbed.
+				RESEND_API_KEY?: string;
+				EMAIL_FROM?: string;
 			};
 		}
 	}
