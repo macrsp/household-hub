@@ -2,6 +2,9 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "household-hub",
 	"compatibility_date": "2026-05-16",
+	// SvelteKit's server runtime imports node:async_hooks; the Cloudflare
+	// Workers runtime needs this flag to provide Node built-ins.
+	"compatibility_flags": ["nodejs_compat"],
 	// Cloudflare Pages serves the SvelteKit build output from this directory.
 	"pages_build_output_dir": ".svelte-kit/cloudflare",
 
