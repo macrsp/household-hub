@@ -15,6 +15,8 @@
 		"db:migrate:remote": "wrangler d1 migrations apply household-hub-db --remote",
 		"db:seed:local": "wrangler d1 execute household-hub-db --local --file ./seed.sql",
 		"db:seed:remote": "wrangler d1 execute household-hub-db --remote --file ./seed.sql",
+		"probe:local": "node scripts/probe-d1.mjs --local",
+		"probe:remote": "node scripts/probe-d1.mjs --remote",
 		"deploy": "wrangler pages deploy .svelte-kit/cloudflare"
 	},
 	"devDependencies": {

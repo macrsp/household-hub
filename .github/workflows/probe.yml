@@ -1,0 +1,37 @@
+name: D1 data probes
+
+# Runs the post-deploy data-integrity probes (PLANS.md User-Asset Durability
+# invariant 4) against the production D1 database — once a day and on demand.
+# Needs the CLOUDFLARE_API_TOKEN repository secret.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * *'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Dormant until the CLOUDFLARE_API_TOKEN repository secret is added
+      # (Settings → Secrets and variables → Actions). Without it, the job
+      # skips with a notice rather than failing the scheduled run.
+      - name: Run D1 data probes against production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN secret not set — skipping D1 probe."
+            exit 0
+          fi
+          npm run probe:remote

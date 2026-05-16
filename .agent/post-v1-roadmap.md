@@ -39,9 +39,14 @@ when each is reached.
   `npm ci`, `npm run check`, `npm run build`, `npm run test:unit` on Node 24
   for every pull request and every push to `main`. PRs now carry a required
   status check; its first run is on the M2 PR itself.
-- [ ] **M3 — Post-deploy data probes.** A script running the per-table
-  invariant queries from `migrations/README.md` against the deployed D1, wired
-  into CI — PLANS.md User-Asset Durability invariant 4.
+- [x] (2026-05-16) **M3 — Post-deploy data probes.** `scripts/probe-d1.mjs`
+  runs the six per-table invariant queries from `migrations/README.md`
+  (`npm run probe:local` / `probe:remote`); verified against production D1 —
+  all 6 invariants hold. `.github/workflows/probe.yml` runs them daily and on
+  demand. The CI workflow is **dormant** until a `CLOUDFLARE_API_TOKEN`
+  repository secret is added (a deliberate operator decision — a no-expiration
+  account-wide token in CI was not auto-stored); it skips with a notice until
+  then. PLANS.md User-Asset Durability invariant 4.
 - [ ] **M4 — Twilio request-signature validation.** Replace the `TODO` in the
   SMS webhook with real `X-Twilio-Signature` HMAC-SHA1 verification against
   `TWILIO_AUTH_TOKEN`.
