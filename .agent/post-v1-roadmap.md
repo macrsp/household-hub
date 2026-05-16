@@ -35,9 +35,10 @@ when each is reached.
   redeployed to production. Verified live: `https://household-hub.pages.dev/api/health`
   → `{"ok":true}` HTTP 200, `/` → 200, `/api/people` → the three seeded
   members (remote D1 binding confirmed).
-- [ ] **M2 — CI pipeline.** GitHub Actions workflow running `npm ci`,
-  `npm run check`, `npm run build`, `npm run test:unit` on every PR and on
-  push to `main`, so PRs gain required status checks.
+- [x] (2026-05-16) **M2 — CI pipeline.** `.github/workflows/ci.yml` runs
+  `npm ci`, `npm run check`, `npm run build`, `npm run test:unit` on Node 24
+  for every pull request and every push to `main`. PRs now carry a required
+  status check; its first run is on the M2 PR itself.
 - [ ] **M3 — Post-deploy data probes.** A script running the per-table
   invariant queries from `migrations/README.md` against the deployed D1, wired
   into CI — PLANS.md User-Asset Durability invariant 4.
