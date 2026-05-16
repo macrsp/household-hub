@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { DELIVERY_PREFERENCES } from '$lib/preferences';
 
 	interface Person {
 		id: string;
@@ -18,14 +19,25 @@
 		author_person_id: string;
 		author_name: string;
 	}
+	interface Prefs {
+		muted: boolean;
+		delivery_preference: string;
+	}
 
 	const POLL_MS = 3000;
+	// Friendly labels for the delivery-preference values (the values
+	// themselves come from $lib/preferences — the single source of truth).
+	const PREF_LABEL: Record<string, string> = {
+		all: 'Texts on',
+		app_only: 'App only'
+	};
 
 	let people = $state<Person[]>([]);
 	let conversations = $state<Conversation[]>([]);
 	let activeSlug = $state('general');
 	let messages = $state<Message[]>([]);
 	let senderId = $state('');
+	let prefs = $state<Prefs | null>(null);
 	let draft = $state('');
 	let sending = $state(false);
 	let errorText = $state('');
@@ -36,7 +48,10 @@
 			const res = await fetch('/api/people');
 			if (!res.ok) return;
 			people = await res.json();
-			if (!senderId && people.length > 0) senderId = people[0].id;
+			if (!senderId && people.length > 0) {
+				senderId = people[0].id;
+				loadPrefs();
+			}
 		} catch {
 			// transient — the poll recovers
 		}
@@ -47,7 +62,6 @@
 			const res = await fetch('/api/conversations');
 			if (!res.ok) return;
 			conversations = await res.json();
-			// If the active slug is not among them, fall back to the first.
 			if (conversations.length > 0 && !conversations.some((c) => c.slug === activeSlug)) {
 				activeSlug = conversations[0].slug;
 			}
@@ -72,12 +86,40 @@
 		}
 	}
 
+	// The active sender's notification preferences for the active conversation.
+	async function loadPrefs() {
+		if (senderId === '') {
+			prefs = null;
+			return;
+		}
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/participants/${senderId}`);
+			prefs = res.ok ? await res.json() : null;
+		} catch {
+			prefs = null;
+		}
+	}
+
+	async function savePrefs(patch: { muted?: boolean; delivery_preference?: string }) {
+		if (senderId === '') return;
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/participants/${senderId}`, {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
+			if (res.ok) prefs = await res.json();
+		} catch {
+			// transient
+		}
+	}
+
 	async function selectConversation(slug: string) {
 		if (slug === activeSlug) return;
 		activeSlug = slug;
 		messages = [];
 		errorText = '';
-		await loadMessages();
+		await Promise.all([loadMessages(), loadPrefs()]);
 	}
 
 	async function send() {
@@ -171,6 +213,28 @@
 		{/if}
 	</section>
 
+	{#if prefs}
+		<div class="prefs">
+			<span class="prefs-label">Notifications for this conversation:</span>
+			<label>
+				<input
+					type="checkbox"
+					checked={prefs.muted}
+					onchange={(e) => savePrefs({ muted: e.currentTarget.checked })}
+				/>
+				Mute
+			</label>
+			<select
+				value={prefs.delivery_preference}
+				onchange={(e) => savePrefs({ delivery_preference: e.currentTarget.value })}
+			>
+				{#each DELIVERY_PREFERENCES as pref (pref)}
+					<option value={pref}>{PREF_LABEL[pref] ?? pref}</option>
+				{/each}
+			</select>
+		</div>
+	{/if}
+
 	<form
 		class="composer"
 		onsubmit={(e) => {
@@ -180,7 +244,7 @@
 	>
 		<label class="sender">
 			<span class="sr-only">Send as</span>
-			<select bind:value={senderId}>
+			<select bind:value={senderId} onchange={loadPrefs}>
 				{#each people as person (person.id)}
 					<option value={person.id}>{person.display_name}</option>
 				{/each}
@@ -313,6 +377,22 @@
 		word-break: break-word;
 	}
 
+	.prefs {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		padding: 0.5rem 1.25rem;
+		border-top: 1px solid #e4e4e7;
+		font-size: 0.8rem;
+		color: #52525b;
+		background: #fafafa;
+	}
+
+	.prefs-label {
+		font-weight: 600;
+	}
+
 	.composer {
 		display: flex;
 		gap: 0.5rem;
@@ -327,6 +407,11 @@
 		border: 1px solid #d4d4d8;
 		border-radius: 0.4rem;
 		padding: 0.5rem;
+	}
+
+	.prefs select {
+		padding: 0.2rem 0.35rem;
+		font-size: 0.8rem;
 	}
 
 	input {

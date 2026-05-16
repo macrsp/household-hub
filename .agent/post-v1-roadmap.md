@@ -69,9 +69,14 @@ when each is reached.
   has a conversation-tab switcher. Verified by curl: `#groceries need milk` →
   groceries thread (prefix stripped); plain SMS → general; `#nosuchconv` →
   general with the text intact. 26 unit tests pass (6 new routing tests).
-- [ ] **M7 — Notification preferences.** Honor `participants.delivery_preference`
-  and `participants.muted` in fanout, with a small UI to set them. (Feature —
-  touches `participants` writes.)
+- [x] (2026-05-16) **M7 — Notification preferences.** `src/lib/preferences.ts`
+  declares the `delivery_preference` set (`all`, `app_only`); `fanout.ts`
+  skips SMS for `app_only` recipients (`muted` was already honored);
+  `GET`/`PUT /api/conversations/[slug]/participants/[personId]` reads and
+  updates a participant's `muted` / `delivery_preference`; `+page.svelte` adds
+  a mute toggle and delivery selector for the active sender. Verified by curl:
+  an `app_only` recipient received no `deliveries` row; a bad
+  `delivery_preference` → 400. 30 unit tests pass.
 - [ ] **M8 — Outbound email transport adapter.** Deliver fanout to `email`
   endpoints via an email-sending API. (Feature — touches `deliveries` writes.)
 - [ ] **M9 — Inbound email.** Email → canonical message, via stable
@@ -210,7 +215,25 @@ and `participants` rows (seed-only write path, as in v1). A unit test in
 `src/lib/server/routing.test.ts` covers `parseConversationPrefix`. No new
 try/catch around a user-asset write is introduced.
 
-**M7–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
+**M7 — Notification preferences.** `src/lib/preferences.ts` declares the
+`delivery_preference` set (`all`, `app_only`) as one source of truth for the
+server validator and the web UI. `fanout.ts` carries each recipient's
+`delivery_preference` and skips SMS for `app_only` (`muted` was already
+honored). `GET`/`PUT /api/conversations/[slug]/participants/[personId]` reads
+and updates a participant's `muted` / `delivery_preference` through the typed
+`updateParticipantPrefs` helper; `+page.svelte` shows a mute toggle and a
+delivery selector for the active sender.
+
+User-Asset Write-Path Checklist (M7): the touched user-asset class is
+`participants`. The write path is `updateParticipantPrefs` in
+`src/lib/server/db.ts`; the server gate is the `PUT` handler in
+`.../participants/[personId]/+server.ts`, which rejects a non-boolean `muted`
+and any `delivery_preference` outside the declared set via `isDeliveryPreference`.
+The declared set lives once in `src/lib/preferences.ts`, enumerated by
+`src/lib/preferences.test.ts`. No new try/catch around a user-asset write is
+introduced.
+
+**M8–M10 — features.** Sketched in `Progress`; each is fleshed out into a full
 milestone spec (purpose, files, steps, acceptance, and a User-Asset Write-Path
 Checklist where it writes user-asset records) when it is reached.
 

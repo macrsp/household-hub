@@ -6,6 +6,7 @@
 // imports route code.
 
 import { nowIso } from './time';
+import type { DeliveryPreference } from '../preferences';
 
 // Single source of truth for the transport string sets. The schema CHECK
 // constraints in migrations/0001_initial.sql mirror these — keep them in sync
@@ -85,5 +86,32 @@ export async function updateDeliveryStatus(
 			 WHERE id = ?`
 		)
 		.bind(status, fields.provider_message_id ?? null, fields.error ?? null, nowIso(), id)
+		.run();
+}
+
+/** Update a participant's notification preferences for one conversation. */
+export async function updateParticipantPrefs(
+	db: D1Database,
+	conversationId: string,
+	personId: string,
+	prefs: { muted?: boolean; delivery_preference?: DeliveryPreference }
+): Promise<void> {
+	const sets: string[] = [];
+	const binds: Array<string | number> = [];
+	if (prefs.muted !== undefined) {
+		sets.push('muted = ?');
+		binds.push(prefs.muted ? 1 : 0);
+	}
+	if (prefs.delivery_preference !== undefined) {
+		sets.push('delivery_preference = ?');
+		binds.push(prefs.delivery_preference);
+	}
+	if (sets.length === 0) return;
+	binds.push(conversationId, personId);
+	await db
+		.prepare(
+			`UPDATE participants SET ${sets.join(', ')} WHERE conversation_id = ? AND person_id = ?`
+		)
+		.bind(...binds)
 		.run();
 }

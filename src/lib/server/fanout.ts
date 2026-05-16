@@ -46,13 +46,14 @@ export async function fanoutMessage(
 	const authorName = author?.display_name ?? 'Unknown';
 
 	// Recipients: conversation participants, minus the author, minus muted.
+	// `delivery_preference` is carried so per-endpoint delivery can honor it.
 	const { results: recipients } = await db
 		.prepare(
-			`SELECT person_id FROM participants
+			`SELECT person_id, delivery_preference FROM participants
 			 WHERE conversation_id = ? AND person_id != ? AND muted = 0`
 		)
 		.bind(message.conversation_id, message.author_person_id)
-		.all<{ person_id: string }>();
+		.all<{ person_id: string; delivery_preference: string }>();
 
 	for (const recipient of recipients) {
 		const { results: endpoints } = await db
@@ -66,6 +67,9 @@ export async function fanoutMessage(
 			// transport yet (the web app reads by polling), so they get no
 			// delivery row — every `deliveries` row is a real send attempt.
 			if (endpoint.type !== 'sms') continue;
+			// `app_only` recipients stay in the conversation but are not
+			// texted — they read via the polling web app.
+			if (recipient.delivery_preference === 'app_only') continue;
 
 			const deliveryId = crypto.randomUUID();
 			const ts = nowIso();
