@@ -20,7 +20,7 @@ You can see it working at the end: with the development server running, loading 
 - [x] (2026-05-16) Milestone 3 — Fanout helper and the outbound SMS adapter (stubbed without Twilio credentials). `src/lib/server/sms.ts` (`sendSms`, stub when secrets absent), `src/lib/server/fanout.ts` (`fanoutMessage`, author + muted skipped, per-iteration try/catch), wired into the app POST route. 16 unit tests pass (transport-set ⇄ schema parity, SMS stub mode). Verified by curl: POST as Matt → exactly 2 `deliveries` rows (Person Two, Person Three — author skipped), both `sent_stubbed`.
 - [x] (2026-05-16) Milestone 4 — Inbound SMS webhook. `POST /api/webhooks/sms` accepts a Twilio-style form post, maps `From` to a household member, stores the message with `source_transport='sms'`, fans out, and returns empty TwiML. Verified by curl: known sender → 200 + `<Response></Response>`; unknown sender → 403 plain-text, nothing written; missing fields → 400; the SMS message appears in the GET thread as `[sms]` and fanned out to 2 recipients.
 - [x] (2026-05-16) Milestone 5 — The PWA front-end page. `src/routes/+page.svelte` (Svelte 5 runes): loads people + messages, sender `<select>`, composer with Enter-to-send, 3-second poll, transport badges, auto-scroll, clean mobile-friendly styling. Verified: `GET /` → HTTP 200 SSR HTML containing the header, `#general`, empty state, composer, and `<title>Household Hub — General</title>`; client interactivity uses the M2 APIs already verified by curl.
-- [ ] Final verification — `npm run check`, `npm run build`, seed + curl acceptance transcript, README complete.
+- [x] (2026-05-16) Final verification — clean-slate run: `.wrangler` state deleted, `db:migrate:local` + `db:seed:local` + `build`, full curl transcript reproduced (health `{"ok":true}`; app POST → 201; inbound SMS → 200 + TwiML; unknown sender → 403; thread shows the `[app]` and `[sms]` messages; 4 `sent_stubbed` deliveries). `README.md` written with all ten required topics. `npm run check` 0/0, `npm run build` green, 16 unit tests pass.
 
 Use timestamps on every entry as work proceeds, and split any partially complete item into a "done" part and a "remaining" part rather than leaving it ambiguous.
 
@@ -72,7 +72,41 @@ Use timestamps on every entry as work proceeds, and split any partially complete
 
 ## Outcomes & Retrospective
 
-To be written at the completion of each milestone and at the end of the plan: what now works that did not before, what was left out, and what the next contributor should know. Compare the result against the Purpose section above.
+v1 complete (2026-05-16). All five build milestones and final verification
+landed via PRs #1–#7 on `main`.
+
+What works now that did not before: a household member can open `/`, pick a
+sender, and send a message; an inbound Twilio-style SMS from a seeded number
+becomes a canonical message and appears in the web thread; every message fans
+out to the other participants' SMS endpoints (stubbed without Twilio
+credentials, recorded on `deliveries` rows). The canonical-conversation
+principle held throughout — `messages` is the single source of truth and both
+the app POST route and the SMS webhook funnel into it and then into one shared
+`fanoutMessage` helper.
+
+What was left out, by design: everything in the "MVP limitations" list of
+`README.md` — auth, email, attachments, multiple conversations, realtime,
+notification preferences, Twilio signature validation, Cloudflare Queues. The
+data model has room for each; the code has `TODO`s where the seams are.
+
+What the next contributor should know:
+
+- Cloudflare auth: `wrangler` cannot authenticate non-interactively here.
+  `wrangler.jsonc`'s `database_id` is an all-zero placeholder; local
+  development ignores it. Before any remote work, set `CLOUDFLARE_API_TOKEN`
+  (or `wrangler login` interactively), run `wrangler d1 create`, and paste the
+  real id in. No remote database, remote migration, or deploy has happened.
+- Verification was local throughout: `npm run check`, `npm run build`,
+  `npm run test:unit` (16 tests), and `curl` transcripts against
+  `wrangler pages dev`. No Playwright E2E suite and no CI pipeline exist yet —
+  both are sensible first follow-ups (see the Decision Log for why they were
+  deferred, and `README.md` "what to implement next").
+- `kit.csrf.checkOrigin = false` is a deprecated setting kept deliberately;
+  migrate to `trustedOrigins` only once Twilio's actual request headers are
+  known (it must not break the webhook).
+- Real outbound SMS has never been exercised — only the stub path. The Twilio
+  REST call in `src/lib/server/sms.ts` is written but unverified against the
+  live API; confirm it when credentials are first added.
 
 ## Context and Orientation
 
