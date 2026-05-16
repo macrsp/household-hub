@@ -55,3 +55,45 @@ export async function sendSms(env: Env, to: string, body: string): Promise<SmsSe
 		return { kind: 'failed', error: e instanceof Error ? e.message : String(e) };
 	}
 }
+
+/**
+ * Verify Twilio's `X-Twilio-Signature` for an inbound webhook POST.
+ *
+ * Twilio signs: the full request URL, then each POST parameter's name
+ * immediately followed by its value, concatenated in alphabetical order by
+ * name; HMAC-SHA1 keyed by the account auth token, base64-encoded. See
+ * Twilio's "Validating Requests" security documentation. Returns true only
+ * when the recomputed signature matches.
+ */
+export async function verifyTwilioSignature(
+	authToken: string,
+	url: string,
+	params: Record<string, string>,
+	signature: string
+): Promise<boolean> {
+	let payload = url;
+	for (const key of Object.keys(params).sort()) {
+		payload += key + params[key];
+	}
+	const enc = new TextEncoder();
+	const key = await crypto.subtle.importKey(
+		'raw',
+		enc.encode(authToken),
+		{ name: 'HMAC', hash: 'SHA-1' },
+		false,
+		['sign']
+	);
+	const mac = await crypto.subtle.sign('HMAC', key, enc.encode(payload));
+	const expected = btoa(String.fromCharCode(...new Uint8Array(mac)));
+	return constantTimeEqual(expected, signature);
+}
+
+/** Compare two strings without short-circuiting on the first differing byte. */
+function constantTimeEqual(a: string, b: string): boolean {
+	if (a.length !== b.length) return false;
+	let diff = 0;
+	for (let i = 0; i < a.length; i++) {
+		diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	}
+	return diff === 0;
+}
