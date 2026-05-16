@@ -92,8 +92,13 @@ when each is reached.
   `README.md` documents the Cloudflare Email Routing → Email Worker glue.
   Verified by curl: routed to groceries / general by the to-address; unknown
   sender → 403. 38 unit tests pass (5 new routing tests).
-- [ ] **M10 — Realtime delivery.** Replace the 3-second poll with server push
-  (Server-Sent Events or a Durable Object).
+- [x] (2026-05-16) **M10 — Realtime delivery.** `GET /api/conversations/[slug]/stream`
+  is a Server-Sent Events endpoint — it emits the recent backlog on connect,
+  then each new message as it appears, with heartbeat comments on idle ticks.
+  `+page.svelte` replaced its 3-second `setInterval` poll with one
+  `EventSource` per conversation (sent messages added optimistically; the
+  stream's echo de-dupes by id). Verified by curl: a message POSTed after the
+  stream connected was pushed to it within ~1.5s. 38 unit tests pass.
 
 ## Surprises & Discoveries
 
@@ -157,7 +162,22 @@ when each is reached.
 - M1 (2026-05-16): household-hub v1 is live at `https://household-hub.pages.dev`,
   backed by remote Cloudflare D1, with `nodejs_compat` enabled. Health, the
   root page, and the D1-backed `/api/people` route all verified in production.
-  Remaining roadmap: M2–M10.
+
+- Roadmap complete (2026-05-16): M1–M10 all merged. Operational hardening —
+  CI (M2), post-deploy data probes (M3), Twilio signature validation (M4),
+  CSRF decision (M5) — and the features the v1 data model was shaped for:
+  multiple conversations (M6), notification preferences (M7), the outbound
+  (M8) and inbound (M9) email transport adapters, and realtime delivery over
+  Server-Sent Events (M10). Each landed as its own PR with green CI; the
+  unit-test suite grew from 0 to 38. Two user-side activations remain
+  optional: adding the `CLOUDFLARE_API_TOKEN` repository secret arms the M3
+  probe workflow, and configuring Cloudflare Email Routing arms M9's inbound
+  path. Real outbound SMS (Twilio) and email (Resend) remain stubbed until
+  their credentials are set — the adapters and the stub paths are exercised,
+  the live provider calls are not. Natural next work beyond this roadmap:
+  exercising the live Twilio/Resend paths once credentials exist, and (if the
+  household outgrows a 1.5 s server-side poll) swapping M10's poll loop for a
+  Durable Object — the SSE endpoint is already the seam for it.
 
 ## Context and Orientation
 
@@ -275,8 +295,22 @@ around the `fanoutMessage` call is the established webhook-fanout pattern (as
 in the SMS webhook): the message write has already succeeded, so logging a
 fanout failure is not a silent fallback on a user-asset write.
 
-**M10 — feature.** Sketched in `Progress`; fleshed out into a full milestone
-spec when reached.
+**M10 — Realtime delivery.** `GET /api/conversations/[slug]/stream` is a
+Server-Sent Events endpoint: a `ReadableStream` that emits the recent backlog
+on connect, then polls D1 every 1.5 s server-side and emits each not-yet-sent
+message as an SSE `data:` event, with `: ping` heartbeats on idle ticks; the
+stream's `cancel` handler stops the loop when the client disconnects.
+`+page.svelte` replaces its `setInterval` poll with one `EventSource` per
+conversation — a sent message is shown optimistically and the stream's echo
+de-dupes by id.
+
+This keeps a short server-side D1 poll rather than a Durable Object — the
+roadmap sketch allowed either, and for a household it is the right size. The
+SSE endpoint is a clean seam: swapping the poll loop for a Durable Object
+subscription later needs no client change.
+
+This milestone touches no user-asset write path (the stream is read-only), so
+it carries no User-Asset Write-Path Checklist.
 
 ## Concrete Steps
 

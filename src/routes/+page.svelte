@@ -24,7 +24,6 @@
 		delivery_preference: string;
 	}
 
-	const POLL_MS = 3000;
 	// Friendly labels for the delivery-preference values (the values
 	// themselves come from $lib/preferences — the single source of truth).
 	const PREF_LABEL: Record<string, string> = {
@@ -42,6 +41,8 @@
 	let sending = $state(false);
 	let errorText = $state('');
 	let listEl: HTMLElement | undefined = $state();
+	// Live message stream for the active conversation (Server-Sent Events).
+	let stream: EventSource | undefined;
 
 	async function loadPeople() {
 		try {
@@ -70,20 +71,27 @@
 		}
 	}
 
-	async function loadMessages() {
-		try {
-			const res = await fetch(`/api/conversations/${activeSlug}/messages`);
-			if (!res.ok) return;
-			const next: Message[] = await res.json();
-			const grew = next.length > messages.length;
-			messages = next;
-			if (grew) {
-				await tick();
-				listEl?.scrollTo({ top: listEl.scrollHeight });
+	// Append one message, de-duplicating by id — the stream re-sends the
+	// recent backlog on connect, and a sent message is added optimistically.
+	function addMessage(message: Message) {
+		if (messages.some((m) => m.id === message.id)) return;
+		messages = [...messages, message];
+		tick().then(() => listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 }));
+	}
+
+	// Open a Server-Sent Events stream for the active conversation. The
+	// endpoint emits the recent backlog on connect, then each new message as
+	// it arrives — no client-side polling. EventSource reconnects on its own.
+	function openStream() {
+		stream?.close();
+		stream = new EventSource(`/api/conversations/${activeSlug}/stream`);
+		stream.onmessage = (event) => {
+			try {
+				addMessage(JSON.parse(event.data) as Message);
+			} catch {
+				// ignore a malformed event
 			}
-		} catch {
-			// transient
-		}
+		};
 	}
 
 	// The active sender's notification preferences for the active conversation.
@@ -114,12 +122,13 @@
 		}
 	}
 
-	async function selectConversation(slug: string) {
+	function selectConversation(slug: string) {
 		if (slug === activeSlug) return;
 		activeSlug = slug;
 		messages = [];
 		errorText = '';
-		await Promise.all([loadMessages(), loadPrefs()]);
+		openStream();
+		loadPrefs();
 	}
 
 	async function send() {
@@ -137,8 +146,12 @@
 				errorText = `Could not send (HTTP ${res.status}).`;
 				return;
 			}
+			// Show the sent message immediately; the stream also delivers it
+			// within a second or so, but addMessage de-dupes by id.
+			const created = (await res.json()) as Message;
+			const senderName = people.find((p) => p.id === senderId)?.display_name ?? '';
+			addMessage({ ...created, author_name: senderName });
 			draft = '';
-			await loadMessages();
 		} catch {
 			errorText = 'Could not send — network error.';
 		} finally {
@@ -166,9 +179,8 @@
 	onMount(() => {
 		loadPeople();
 		loadConversations();
-		loadMessages();
-		const timer = setInterval(loadMessages, POLL_MS);
-		return () => clearInterval(timer);
+		openStream();
+		return () => stream?.close();
 	});
 </script>
 
