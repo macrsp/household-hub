@@ -18,15 +18,25 @@ async function conversationIdBySlug(db: D1Database, slug: string): Promise<strin
 // GET /api/conversations/[slug]/messages — recent messages, oldest-first,
 // each carrying the author's display name and delivery counts. With
 // `?before=<ISO timestamp>`, returns the page of messages immediately older
-// than that timestamp instead — used for "load older" pagination.
+// than that timestamp instead — used for "load older" pagination. With
+// `?q=<term>`, returns messages whose body matches the term.
 export const GET: RequestHandler = async ({ platform, params, url }) => {
 	const db = requireDb(platform);
 	const conversationId = await conversationIdBySlug(db, params.slug);
 
-	// Optional pagination cursor: only messages strictly older than `before`.
+	// Filtering: ?q= searches message bodies; ?before= paginates to older
+	// messages. If both are present, search takes precedence.
+	const q = url.searchParams.get('q')?.trim();
 	const before = url.searchParams.get('before');
-	const olderClause = before ? 'AND m.created_at < ?' : '';
-	const binds = before ? [conversationId, before] : [conversationId];
+	let filterClause = '';
+	const binds: string[] = [conversationId];
+	if (q) {
+		filterClause = 'AND m.body LIKE ?';
+		binds.push(`%${q}%`);
+	} else if (before) {
+		filterClause = 'AND m.created_at < ?';
+		binds.push(before);
+	}
 
 	// Take the most-recent 200 (older than the cursor, if given), then present
 	// them ascending for display.
@@ -44,7 +54,7 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 			             AND d.status = 'failed') AS delivery_failed
 			   FROM messages m
 			   JOIN people p ON p.id = m.author_person_id
-			   WHERE m.conversation_id = ? ${olderClause}
+			   WHERE m.conversation_id = ? ${filterClause}
 			   ORDER BY m.created_at DESC
 			   LIMIT 200
 			 )

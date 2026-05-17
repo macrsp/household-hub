@@ -123,6 +123,9 @@ when each is reached.
 - [ ] **M15 — Per-sender colours.** Each household member gets a stable colour
   from their id — a coloured initial avatar and a tinted name on every
   message — so the conversation is visually scannable by sender.
+- [ ] **M16 — Message search.** `GET …/messages?q=<term>` matches message
+  bodies; the conversation header gets a search box that shows matching
+  messages with a results banner and a Clear button.
 
 ## Surprises & Discoveries
 
@@ -412,6 +415,15 @@ stays put. Read-only — no Write-Path Checklist.
 helper hashes a person's id to a stable hue (0–359); each message's metadata
 row gains a small coloured circle with the sender's initial, and the sender's
 name is tinted to the same hue. No API, database, or write path is touched.
+
+**M16 — Message search.** `GET /api/conversations/[slug]/messages` accepts
+`?q=<term>` — the query adds `AND m.body LIKE ?` with a bound `%term%`
+parameter (no injection) and returns matching messages; `?q=` takes precedence
+over `?before=`. `+page.svelte` adds a search box in the header: submitting
+fetches matches into a `searchResults` array and switches the message list
+into search mode, with a results banner and a Clear button; clearing the
+search or switching conversation returns to the live view. Read-only — no
+Write-Path Checklist.
 
 ## Concrete Steps
 
