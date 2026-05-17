@@ -16,11 +16,20 @@ async function conversationIdBySlug(db: D1Database, slug: string): Promise<strin
 }
 
 // GET /api/conversations/[slug]/messages — recent messages, oldest-first,
-// each carrying the author's display name (joined from `people`).
-export const GET: RequestHandler = async ({ platform, params }) => {
+// each carrying the author's display name and delivery counts. With
+// `?before=<ISO timestamp>`, returns the page of messages immediately older
+// than that timestamp instead — used for "load older" pagination.
+export const GET: RequestHandler = async ({ platform, params, url }) => {
 	const db = requireDb(platform);
 	const conversationId = await conversationIdBySlug(db, params.slug);
-	// Take the most-recent 200, then present them ascending for display.
+
+	// Optional pagination cursor: only messages strictly older than `before`.
+	const before = url.searchParams.get('before');
+	const olderClause = before ? 'AND m.created_at < ?' : '';
+	const binds = before ? [conversationId, before] : [conversationId];
+
+	// Take the most-recent 200 (older than the cursor, if given), then present
+	// them ascending for display.
 	const { results } = await db
 		.prepare(
 			`SELECT id, body, source_transport, created_at, author_person_id, author_name,
@@ -35,13 +44,13 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 			             AND d.status = 'failed') AS delivery_failed
 			   FROM messages m
 			   JOIN people p ON p.id = m.author_person_id
-			   WHERE m.conversation_id = ?
+			   WHERE m.conversation_id = ? ${olderClause}
 			   ORDER BY m.created_at DESC
 			   LIMIT 200
 			 )
 			 ORDER BY created_at ASC`
 		)
-		.bind(conversationId)
+		.bind(...binds)
 		.all();
 	return json(results);
 };

@@ -43,6 +43,8 @@
 	let draft = $state('');
 	let sending = $state(false);
 	let errorText = $state('');
+	let loadingOlder = $state(false);
+	let noMoreOlder = $state(false);
 	let listEl: HTMLElement | undefined = $state();
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
@@ -130,8 +132,39 @@
 		activeSlug = slug;
 		messages = [];
 		errorText = '';
+		noMoreOlder = false;
 		openStream();
 		loadPrefs();
+	}
+
+	// Fetch the page of messages older than the oldest one loaded and prepend
+	// them, keeping the viewport stable so the reader doesn't lose their place.
+	async function loadOlder() {
+		if (loadingOlder || noMoreOlder || messages.length === 0) return;
+		loadingOlder = true;
+		try {
+			const before = messages[0].created_at;
+			const res = await fetch(
+				`/api/conversations/${activeSlug}/messages?before=${encodeURIComponent(before)}`
+			);
+			if (!res.ok) return;
+			const older: Message[] = await res.json();
+			const known = new Set(messages.map((m) => m.id));
+			const fresh = older.filter((m) => !known.has(m.id));
+			if (fresh.length === 0) {
+				noMoreOlder = true;
+				return;
+			}
+			const previousHeight = listEl?.scrollHeight ?? 0;
+			messages = [...fresh, ...messages];
+			await tick();
+			if (listEl) listEl.scrollTop += listEl.scrollHeight - previousHeight;
+			if (older.length < 200) noMoreOlder = true;
+		} catch {
+			// transient
+		} finally {
+			loadingOlder = false;
+		}
 	}
 
 	async function send() {
@@ -210,6 +243,11 @@
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite">
+		{#if messages.length > 0 && !noMoreOlder}
+			<button type="button" class="load-older" onclick={loadOlder} disabled={loadingOlder}>
+				{loadingOlder ? 'Loading…' : 'Load older messages'}
+			</button>
+		{/if}
 		{#if messages.length === 0}
 			<p class="empty">No messages in #{activeSlug} yet. Say hello below.</p>
 		{:else}
@@ -410,6 +448,24 @@
 		margin: 0.3rem 0 0;
 		font-size: 0.68rem;
 		color: #a1a1aa;
+	}
+
+	.load-older {
+		align-self: center;
+		font: inherit;
+		font-size: 0.78rem;
+		padding: 0.3rem 0.8rem;
+		margin-bottom: 0.25rem;
+		border: 1px solid #d4d4d8;
+		border-radius: 999px;
+		background: #ffffff;
+		color: #52525b;
+		cursor: pointer;
+	}
+
+	.load-older:disabled {
+		color: #a1a1aa;
+		cursor: default;
 	}
 
 	.prefs {
