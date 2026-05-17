@@ -169,6 +169,9 @@ when each is reached.
 - [ ] **M29 — Jump-to-latest button.** New messages no longer yank the reader
   down while they are scrolled up reading history; a floating "↓ Latest"
   button appears instead and returns them to the newest message on click.
+- [ ] **M30 — Export conversation transcript.** `GET …/export` returns the
+  whole conversation as a plain-text file download; the Manage panel gets an
+  Export link.
 
 ## Surprises & Discoveries
 
@@ -688,6 +691,16 @@ was already at the bottom — a new message no longer yanks someone reading
 history downward. While `atBottom` is false a floating "↓ Latest" button
 (sticky at the bottom of the list) is shown; clicking it smooth-scrolls to the
 newest message.
+
+**M30 — Export conversation transcript.** A read-only feature — no write path,
+so no Write-Path Checklist. A new route `GET /api/conversations/[slug]/export`
+reads every message in the conversation (oldest-first), formats each as
+`[ISO time] Author (transport): body`, and returns the result as a
+`text/plain` response with a `Content-Disposition: attachment` filename so the
+browser downloads it. A soft-deleted message becomes a `[deleted]` line and an
+edited one is suffixed `(edited)` — the transcript stays honest without
+exposing retracted text. `+page.svelte` adds an Export link (a download
+anchor) to the conversation Manage panel.
 
 ## Concrete Steps
 
