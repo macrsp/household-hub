@@ -120,6 +120,9 @@ when each is reached.
   returns the page of messages older than the cursor; the conversation view
   gets a "Load older messages" button that prepends them with the scroll
   position kept stable.
+- [ ] **M15 — Per-sender colours.** Each household member gets a stable colour
+  from their id — a coloured initial avatar and a tinted name on every
+  message — so the conversation is visually scannable by sender.
 
 ## Surprises & Discoveries
 
@@ -404,6 +407,11 @@ on demand. `+page.svelte` shows a "Load older messages" button above the list
 that fetches with the oldest loaded message's timestamp as the cursor,
 prepends the de-duplicated results, and adjusts `scrollTop` so the viewport
 stays put. Read-only — no Write-Path Checklist.
+
+**M15 — Per-sender colours.** Purely a `+page.svelte` change. A `personHue(id)`
+helper hashes a person's id to a stable hue (0–359); each message's metadata
+row gains a small coloured circle with the sender's initial, and the sender's
+name is tinted to the same hue. No API, database, or write path is touched.
 
 ## Concrete Steps
 

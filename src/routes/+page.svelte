@@ -212,6 +212,17 @@
 		});
 	}
 
+	// A stable hue (0–359) for a person, so each member keeps one colour.
+	function personHue(key: string): number {
+		let h = 0;
+		for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 360;
+		return h;
+	}
+
+	function initial(name: string): string {
+		return (name.trim()[0] ?? '?').toUpperCase();
+	}
+
 	onMount(() => {
 		loadPeople();
 		loadConversations();
@@ -254,7 +265,13 @@
 			{#each messages as message (message.id)}
 				<article class="message">
 					<div class="meta">
-						<span class="author">{message.author_name}</span>
+						<span
+							class="avatar"
+							style="background: hsl({personHue(message.author_person_id)} 55% 45%)"
+							aria-hidden="true">{initial(message.author_name)}</span>
+						<span class="author" style="color: hsl({personHue(message.author_person_id)} 45% 35%)"
+							>{message.author_name}</span
+						>
 						<span class="transport" title="arrived via {message.source_transport}">
 							{message.source_transport}
 						</span>
@@ -413,14 +430,26 @@
 
 	.meta {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.75rem;
 	}
 
 	.author {
 		font-weight: 600;
-		color: #18181b;
+	}
+
+	.avatar {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.15rem;
+		height: 1.15rem;
+		border-radius: 50%;
+		color: #ffffff;
+		font-size: 0.62rem;
+		font-weight: 700;
+		flex: none;
 	}
 
 	.transport {
