@@ -136,6 +136,8 @@ when each is reached.
 - [ ] **M19 — Installable PWA.** A web app manifest, an SVG icon,
   theme-colour and Apple meta tags, and a minimal service worker that caches
   the built app shell — so household-hub can be installed to a home screen.
+- [ ] **M20 — Date separators.** The message list shows a "Today" /
+  "Yesterday" / date divider between messages from different calendar days.
 
 ## Surprises & Discoveries
 
@@ -480,6 +482,12 @@ theme/background colours), `static/icon.svg` (a household-hub mark), the
 only the built shell (`build` + `files`) and leaves pages, `/api/*`, and the
 SSE stream entirely to the network, so an installed copy never shows stale
 data. No API, database, or write path is touched.
+
+**M20 — Date separators.** Purely a `+page.svelte` change. `dayKey` groups
+messages by calendar day and `dayLabel` renders divider text (Today /
+Yesterday / weekday + date); the message-list `{#each}` emits a `.day-divider`
+before the first message of each new day. Applies to both the live view and
+search results. No API, database, or write path is touched.
 
 ## Concrete Steps
 
