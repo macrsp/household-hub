@@ -188,6 +188,17 @@ when each is reached.
   household outgrows a 1.5 s server-side poll) swapping M10's poll loop for a
   Durable Object — the SSE endpoint is already the seam for it.
 
+- M11 (2026-05-16): the inbound-email bridge is built and deployed. The
+  `household-hub-email` Email Worker is live, the `EMAIL_WEBHOOK_SECRET`
+  shared secret is set on both it and the Pages project, and migration 0002
+  put the real household email endpoints into local and remote D1. Verified
+  in production: `POST /api/webhooks/email` returns 403 without the secret
+  header, 403 with a wrong one, and 200 with the correct one. A lesson worth
+  keeping: Cloudflare Pages binds secrets at deploy time, so a
+  `wrangler pages secret put` must be followed by a redeploy to take effect.
+  The one remaining step is the operator's: adding Email Routing
+  custom-address rules (`general@`, `groceries@`) that point at the Worker.
+
 ## Context and Orientation
 
 household-hub is a SvelteKit + `@sveltejs/adapter-cloudflare` app deployed as
