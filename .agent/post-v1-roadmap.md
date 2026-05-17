@@ -116,6 +116,10 @@ when each is reached.
 - [ ] **M13 — Message delivery receipts.** The conversation view shows, under
   each message the current sender authored, how many recipients it reached —
   surfacing the `deliveries` data the relay already records.
+- [ ] **M14 — Load-older pagination.** `GET …/messages?before=<timestamp>`
+  returns the page of messages older than the cursor; the conversation view
+  gets a "Load older messages" button that prepends them with the scroll
+  position kept stable.
 
 ## Surprises & Discoveries
 
@@ -389,6 +393,17 @@ after fanout so the sender's own message shows a receipt immediately.
 `+page.svelte` renders a small receipt under each message the current sender
 authored — `✓ sent to N`, `sending… (k/N)`, or a failed count. Read-only — no
 user-asset write path — so no Write-Path Checklist.
+
+**M14 — Load-older pagination.** The messages list only ever held the most
+recent page; older history was unreachable. `GET /api/conversations/[slug]/messages`
+now accepts an optional `?before=<ISO timestamp>` cursor — with it, the query
+adds `AND m.created_at < ?` and returns the 200 messages immediately older
+than the cursor (without it, the most recent 200, unchanged). The SSE stream
+still carries the recent backlog and live messages; older history is fetched
+on demand. `+page.svelte` shows a "Load older messages" button above the list
+that fetches with the oldest loaded message's timestamp as the cursor,
+prepends the de-duplicated results, and adjusts `scrollTop` so the viewport
+stays put. Read-only — no Write-Path Checklist.
 
 ## Concrete Steps
 
