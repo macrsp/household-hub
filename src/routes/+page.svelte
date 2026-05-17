@@ -87,6 +87,9 @@
 	const archivedConversations = $derived(conversations.filter((c) => c.archived_at));
 	const activeConversation = $derived(conversations.find((c) => c.slug === activeSlug));
 	let listEl: HTMLElement | undefined = $state();
+	// Whether the message list is scrolled to (or near) the newest message —
+	// drives the jump-to-latest button and smarter auto-scroll (M29).
+	let atBottom = $state(true);
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
 	// How often the conversation list is re-fetched so unread activity in
@@ -163,11 +166,27 @@
 			messages = messages.map((m, i) => (i === idx ? { ...m, ...message } : m));
 			return;
 		}
+		// Capture the scroll position *before* the list grows: only follow the
+		// newest message if the reader was already at the bottom, so a new
+		// message never yanks someone reading history downward.
+		const wasAtBottom = atBottom;
 		messages = [...messages, message];
 		// A new message in the thread on screen is read as it arrives.
 		markRead(activeSlug);
 		maybeNotify(message);
-		tick().then(() => listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 }));
+		tick().then(() => {
+			if (wasAtBottom) listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 });
+		});
+	}
+
+	// Recompute whether the message list is at (or near) its newest message.
+	function updateAtBottom() {
+		if (!listEl) return;
+		atBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 80;
+	}
+
+	function scrollToLatest() {
+		listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' });
 	}
 
 	// Open a Server-Sent Events stream for the active conversation. The
@@ -223,6 +242,7 @@
 		errorText = '';
 		noMoreOlder = false;
 		clearSearch();
+		atBottom = true;
 		openStream();
 		loadPrefs();
 		markRead(slug);
@@ -775,7 +795,7 @@
 		</form>
 	</header>
 
-	<section class="messages" bind:this={listEl} aria-live="polite">
+	<section class="messages" bind:this={listEl} aria-live="polite" onscroll={updateAtBottom}>
 		{#if searchMode}
 			<p class="search-banner">
 				{searchResults.length} result{searchResults.length === 1 ? '' : 's'} for “{lastSearch}”
@@ -855,6 +875,9 @@
 					{/if}
 				</article>
 			{/each}
+		{/if}
+		{#if !atBottom && !searchMode && shown.length > 0}
+			<button type="button" class="jump-latest" onclick={scrollToLatest}>↓ Latest</button>
 		{/if}
 	</section>
 
@@ -1227,6 +1250,21 @@
 		background: var(--surface);
 		color: var(--muted);
 		cursor: pointer;
+	}
+
+	.jump-latest {
+		position: sticky;
+		bottom: 0.5rem;
+		align-self: center;
+		font: inherit;
+		font-size: 0.78rem;
+		padding: 0.35rem 0.9rem;
+		border: 1px solid var(--accent);
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--on-accent);
+		cursor: pointer;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 	}
 
 	.load-older:disabled {
