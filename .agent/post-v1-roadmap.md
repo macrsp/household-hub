@@ -145,6 +145,10 @@ when each is reached.
   retract their own message; the canonical row is kept, read paths blank the
   body and show a "Message deleted" tombstone, and the SSE stream propagates
   the retraction to every open client.
+- [ ] **M23 — Unread conversation indicators.** `GET /api/conversations`
+  reports each thread's latest message time; the conversation tab bar shows an
+  unread dot on any thread with activity newer than the device last viewed it,
+  with the last-viewed time kept per conversation in `localStorage`.
 
 ## Surprises & Discoveries
 
@@ -542,6 +546,20 @@ database. A real-auth round-trip was exercised against `wrangler pages dev`
 search miss) — recorded under Outcomes. No new try/catch wraps the write: the
 `DELETE` handler lets a failed write throw to a 500 (no silent fallback), and
 `softDeleteMessage` is a single statement with no loop.
+
+**M23 — Unread conversation indicators.** A read-only feature — no API write
+path, no migration, no user-asset write, so no Write-Path Checklist. The
+`GET /api/conversations` handler gains a `last_message_at` column: a correlated
+`SELECT max(m.created_at) … WHERE m.conversation_id = c.id AND m.deleted_at IS
+NULL` so the timestamp reflects the latest *readable* message (a retracted
+message does not mark a thread unread). `+page.svelte` keeps a per-conversation
+last-viewed timestamp in `localStorage` under `hh-read-<slug>`, mirrored into a
+`$state` map for reactivity; a conversation tab shows an unread dot when its
+`last_message_at` is newer than the stored value and it is not the active
+thread. The active conversation is stamped read on selection and again each
+time a new message streams in, so it never shows its own dot. The conversation
+list is re-fetched on a modest interval (so other threads' activity surfaces
+without opening them), reusing the existing `loadConversations()`.
 
 ## Concrete Steps
 

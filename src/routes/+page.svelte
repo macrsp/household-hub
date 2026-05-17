@@ -10,6 +10,9 @@
 		id: string;
 		name: string;
 		slug: string;
+		// Timestamp of the newest readable message, or null for an empty
+		// thread — compared against the per-device last-viewed time (M23).
+		last_message_at?: string | null;
 	}
 	interface Message {
 		id: string;
@@ -55,11 +58,18 @@
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	let theme = $state<'auto' | 'light' | 'dark'>('auto');
+	// Per-conversation last-viewed timestamps (slug -> ISO), mirrored from
+	// localStorage — drives the unread dot on each conversation tab (M23).
+	let readState = $state<Record<string, string>>({});
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
 	let listEl: HTMLElement | undefined = $state();
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
+	// How often the conversation list is re-fetched so unread activity in
+	// threads other than the active one surfaces without opening them.
+	const CONVERSATIONS_REFRESH_MS = 15000;
+	let conversationsTimer: ReturnType<typeof setInterval> | undefined;
 
 	async function loadPeople() {
 		try {
@@ -83,9 +93,41 @@
 			if (conversations.length > 0 && !conversations.some((c) => c.slug === activeSlug)) {
 				activeSlug = conversations[0].slug;
 			}
+			// Hydrate the last-viewed time for any conversation not seen yet,
+			// then stamp the active thread read — it is on screen right now.
+			for (const c of conversations) {
+				if (readState[c.slug] !== undefined) continue;
+				try {
+					const saved = localStorage.getItem(`hh-read-${c.slug}`);
+					if (saved) readState = { ...readState, [c.slug]: saved };
+				} catch {
+					// localStorage unavailable — unread dots simply stay off
+				}
+			}
+			markRead(activeSlug);
 		} catch {
 			// transient
 		}
+	}
+
+	// Record that the active device has now viewed a conversation: persist the
+	// current time as its last-viewed mark so its unread dot clears.
+	function markRead(slug: string) {
+		const now = new Date().toISOString();
+		readState = { ...readState, [slug]: now };
+		try {
+			localStorage.setItem(`hh-read-${slug}`, now);
+		} catch {
+			// localStorage unavailable — the in-memory mark still clears the dot
+		}
+	}
+
+	// A conversation is unread when it has a readable message newer than this
+	// device last viewed it. The active thread is never unread — it is open.
+	function isUnread(conversation: Conversation): boolean {
+		if (conversation.slug === activeSlug) return false;
+		const last = conversation.last_message_at;
+		return last != null && last > (readState[conversation.slug] ?? '');
 	}
 
 	// Upsert one message by id. A new message is appended (and scrolled to);
@@ -99,6 +141,8 @@
 			return;
 		}
 		messages = [...messages, message];
+		// A new message in the thread on screen is read as it arrives.
+		markRead(activeSlug);
 		tick().then(() => listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 }));
 	}
 
@@ -154,6 +198,7 @@
 		clearSearch();
 		openStream();
 		loadPrefs();
+		markRead(slug);
 	}
 
 	// Fetch the page of messages older than the oldest one loaded and prepend
@@ -374,7 +419,11 @@
 		loadPeople();
 		loadConversations();
 		openStream();
-		return () => stream?.close();
+		conversationsTimer = setInterval(loadConversations, CONVERSATIONS_REFRESH_MS);
+		return () => {
+			stream?.close();
+			if (conversationsTimer) clearInterval(conversationsTimer);
+		};
 	});
 </script>
 
@@ -400,6 +449,9 @@
 					onclick={() => selectConversation(conversation.slug)}
 				>
 					#{conversation.slug}
+					{#if isUnread(conversation)}
+						<span class="unread-dot" aria-label="unread messages"></span>
+					{/if}
 				</button>
 			{/each}
 			<button
@@ -647,6 +699,16 @@
 
 	.conv-new {
 		font-weight: 700;
+	}
+
+	.unread-dot {
+		display: inline-block;
+		width: 0.4rem;
+		height: 0.4rem;
+		margin-left: 0.3rem;
+		border-radius: 50%;
+		background: var(--accent);
+		vertical-align: 0.05rem;
 	}
 
 	.new-conv {
