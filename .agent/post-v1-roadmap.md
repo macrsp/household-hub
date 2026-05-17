@@ -166,6 +166,9 @@ when each is reached.
 - [ ] **M28 — Desktop notifications for new messages.** With the member's
   permission, a browser notification fires when a message from someone else
   arrives while the tab is in the background.
+- [ ] **M29 — Jump-to-latest button.** New messages no longer yank the reader
+  down while they are scrolled up reading history; a floating "↓ Latest"
+  button appears instead and returns them to the newest message on click.
 
 ## Surprises & Discoveries
 
@@ -675,6 +678,16 @@ short body; clicking it focuses the window. Backlog messages replayed on
 connect are older than `streamOpenedAt`, so reconnecting never re-notifies.
 The whole feature is guarded by `typeof Notification !== 'undefined'` so it is
 inert where the API is unavailable.
+
+**M29 — Jump-to-latest button.** Purely a `+page.svelte` change — no API,
+database, or write path is touched, so no Write-Path Checklist. An `onscroll`
+handler on the message list maintains an `atBottom` flag (true when the
+scrollport is within ~80px of the end). `addMessage` captures `atBottom`
+*before* appending and only auto-scrolls to the newest message if the reader
+was already at the bottom — a new message no longer yanks someone reading
+history downward. While `atBottom` is false a floating "↓ Latest" button
+(sticky at the bottom of the list) is shown; clicking it smooth-scrolls to the
+newest message.
 
 ## Concrete Steps
 
