@@ -51,6 +51,8 @@
 	let lastSearch = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
+	// The list currently on screen — search results when searching, else live.
+	const shown = $derived(searchMode ? searchResults : messages);
 	let listEl: HTMLElement | undefined = $state();
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
@@ -293,6 +295,22 @@
 		return (name.trim()[0] ?? '?').toUpperCase();
 	}
 
+	// Day-divider helpers: dayKey groups messages by calendar day; dayLabel
+	// renders the divider text (Today / Yesterday / a weekday + date).
+	function dayKey(iso: string): string {
+		return new Date(iso).toDateString();
+	}
+
+	function dayLabel(iso: string): string {
+		const d = new Date(iso);
+		const today = new Date();
+		const yesterday = new Date();
+		yesterday.setDate(today.getDate() - 1);
+		if (d.toDateString() === today.toDateString()) return 'Today';
+		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+		return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+	}
+
 	onMount(() => {
 		loadPeople();
 		loadConversations();
@@ -377,14 +395,17 @@
 				{loadingOlder ? 'Loading…' : 'Load older messages'}
 			</button>
 		{/if}
-		{#if (searchMode ? searchResults : messages).length === 0}
+		{#if shown.length === 0}
 			<p class="empty">
 				{searchMode
 					? 'No messages match your search.'
 					: `No messages in #${activeSlug} yet. Say hello below.`}
 			</p>
 		{:else}
-			{#each searchMode ? searchResults : messages as message (message.id)}
+			{#each shown as message, i (message.id)}
+				{#if i === 0 || dayKey(message.created_at) !== dayKey(shown[i - 1].created_at)}
+					<div class="day-divider">{dayLabel(message.created_at)}</div>
+				{/if}
 				<article class="message">
 					<div class="meta">
 						<span
@@ -646,6 +667,15 @@
 		margin: 0.3rem 0 0;
 		font-size: 0.68rem;
 		color: #a1a1aa;
+	}
+
+	.day-divider {
+		align-self: center;
+		font-size: 0.68rem;
+		color: #a1a1aa;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		margin: 0.35rem 0;
 	}
 
 	.load-older {
