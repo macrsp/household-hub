@@ -24,6 +24,9 @@ declare global {
 				// Shared secret for the inbound-email bridge Worker. When set,
 				// POST /api/webhooks/email requires a matching X-Webhook-Secret.
 				EMAIL_WEBHOOK_SECRET?: string;
+				// Public base URL of the deployed app (not a secret) — used to
+				// build the Twilio delivery-status callback URL.
+				PUBLIC_APP_URL?: string;
 			};
 		}
 	}

@@ -35,6 +35,12 @@ export async function sendSms(env: Env, to: string, body: string): Promise<SmsSe
 	const from = env.TWILIO_FROM_NUMBER as string;
 	const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
 	const form = new URLSearchParams({ To: to, From: from, Body: body });
+	// When a public app URL is configured, ask Twilio to POST delivery-status
+	// updates to the sms-status webhook so the deliveries row tracks the real
+	// carrier outcome (queued → sent → delivered / failed).
+	if (env.PUBLIC_APP_URL) {
+		form.set('StatusCallback', `${env.PUBLIC_APP_URL}/api/webhooks/sms-status`);
+	}
 
 	try {
 		const res = await fetch(url, {
@@ -96,4 +102,21 @@ function constantTimeEqual(a: string, b: string): boolean {
 		diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
 	}
 	return diff === 0;
+}
+
+/**
+ * Map a Twilio `MessageStatus` to a household-hub delivery status: `delivered`
+ * is terminal success, `undelivered` / `failed` are failures, and every
+ * in-flight state (queued, sending, sent, accepted, …) collapses to `sent`.
+ */
+export function mapTwilioStatus(twilioStatus: string): string {
+	switch (twilioStatus) {
+		case 'delivered':
+			return 'delivered';
+		case 'undelivered':
+		case 'failed':
+			return 'failed';
+		default:
+			return 'sent';
+	}
 }

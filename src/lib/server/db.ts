@@ -115,3 +115,23 @@ export async function updateParticipantPrefs(
 		.bind(...binds)
 		.run();
 }
+
+/**
+ * Update a delivery row's status by its provider message id — used by the
+ * Twilio delivery-status callback. `error` is written only when provided
+ * (COALESCE keeps any existing error otherwise).
+ */
+export async function updateDeliveryByProviderId(
+	db: D1Database,
+	providerMessageId: string,
+	status: string,
+	fields: { error?: string } = {}
+): Promise<void> {
+	await db
+		.prepare(
+			`UPDATE deliveries SET status = ?, error = COALESCE(?, error), updated_at = ?
+			 WHERE provider_message_id = ?`
+		)
+		.bind(status, fields.error ?? null, nowIso(), providerMessageId)
+		.run();
+}

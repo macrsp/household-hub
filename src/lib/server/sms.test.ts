@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { verifyTwilioSignature } from './sms';
+import { verifyTwilioSignature, mapTwilioStatus } from './sms';
 
 // `validSignature` is HMAC-SHA1(payload, authToken) base64 for this exact URL
 // and POST-parameter set, where `payload` is built by Twilio's documented
@@ -36,5 +36,22 @@ describe('verifyTwilioSignature', () => {
 
 	it('rejects an empty signature', async () => {
 		expect(await verifyTwilioSignature(authToken, url, params, '')).toBe(false);
+	});
+});
+
+describe('mapTwilioStatus', () => {
+	it('maps delivered to delivered', () => {
+		expect(mapTwilioStatus('delivered')).toBe('delivered');
+	});
+
+	it('maps undelivered and failed to failed', () => {
+		expect(mapTwilioStatus('undelivered')).toBe('failed');
+		expect(mapTwilioStatus('failed')).toBe('failed');
+	});
+
+	it('maps in-flight states to sent', () => {
+		for (const s of ['queued', 'sending', 'sent', 'accepted']) {
+			expect(mapTwilioStatus(s)).toBe('sent');
+		}
 	});
 });

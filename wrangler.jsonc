@@ -17,7 +17,13 @@
 			"database_name": "household-hub-db",
 			"database_id": "e0e4439e-7bf6-4e53-bccc-b0bb1e855cfb"
 		}
-	]
+	],
+
+	// Public (non-secret) base URL of the deployed app — used to build the
+	// Twilio delivery-status callback URL in the SMS adapter.
+	"vars": {
+		"PUBLIC_APP_URL": "https://household-hub.pages.dev"
+	}
 
 	// TODO(queues): v1 fans messages out synchronously (see
 	// .agent/household-relay-v1.md, Decision Log). When fanout moves async,
