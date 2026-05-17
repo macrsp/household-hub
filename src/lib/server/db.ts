@@ -135,3 +135,31 @@ export async function updateDeliveryByProviderId(
 		.bind(status, fields.error ?? null, nowIso(), providerMessageId)
 		.run();
 }
+
+/**
+ * Create a conversation and add the given people as its participants, in one
+ * atomic D1 batch — so a conversation never exists with a partial set of
+ * participants. The only runtime write path to `conversations` and
+ * `participants`.
+ */
+export async function createConversationWithParticipants(
+	db: D1Database,
+	conversation: { id: string; name: string; slug: string; created_at: string },
+	personIds: string[]
+): Promise<void> {
+	const statements = [
+		db
+			.prepare('INSERT INTO conversations (id, name, slug, created_at) VALUES (?, ?, ?, ?)')
+			.bind(conversation.id, conversation.name, conversation.slug, conversation.created_at),
+		...personIds.map((personId) =>
+			db
+				.prepare(
+					`INSERT OR IGNORE INTO participants
+					 (conversation_id, person_id, delivery_preference, muted)
+					 VALUES (?, ?, 'all', 0)`
+				)
+				.bind(conversation.id, personId)
+		)
+	];
+	await db.batch(statements);
+}
