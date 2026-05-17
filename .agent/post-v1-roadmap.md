@@ -153,6 +153,9 @@ when each is reached.
   message they sent; the canonical body is replaced in place, the app shows an
   "(edited)" marker, and the SSE stream propagates the edit to every open
   client. A deleted message cannot be edited.
+- [ ] **M25 — Clickable links in messages.** URLs in a message body render as
+  clickable links that open in a new tab; the body is split into safe text and
+  link segments — no raw HTML — so no message can inject markup.
 
 ## Surprises & Discoveries
 
@@ -597,6 +600,17 @@ a deleted message, 200 author edit, `edited_at` set, body replaced) — recorded
 under Outcomes. No new try/catch wraps the write: the `PATCH` handler lets a
 failed write throw to a 500 (no silent fallback), and `editMessage` is a
 single statement with no loop.
+
+**M25 — Clickable links in messages.** Purely a `+page.svelte` change — no API,
+database, or write path is touched, so no Write-Path Checklist. A `linkify`
+helper splits a message body into an array of `text` and `link` segments using
+a URL regex (`https?://…` and bare `www.…`), trimming trailing sentence
+punctuation off a matched URL. The message body `{#each}`-renders the segments:
+a `text` segment is bound as a text node and a `link` segment as an `<a>` with
+its `href`/text bound as attributes/text — never `{@html}` — so a message body
+can never inject markup. Links open in a new tab with `rel="noopener
+noreferrer"`. `white-space: pre-wrap` on `.body` still preserves newlines
+because each text segment keeps its literal whitespace.
 
 ## Concrete Steps
 
