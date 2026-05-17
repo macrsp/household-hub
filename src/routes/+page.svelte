@@ -49,6 +49,8 @@
 	let searchMode = $state(false);
 	let searchResults = $state<Message[]>([]);
 	let lastSearch = $state('');
+	let creatingConversation = $state(false);
+	let newConvName = $state('');
 	let listEl: HTMLElement | undefined = $state();
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
@@ -199,6 +201,42 @@
 		lastSearch = '';
 	}
 
+	// Create a new conversation: derive a slug from the name, POST it, switch.
+	async function createConversation() {
+		const name = newConvName.trim();
+		if (name === '') return;
+		const slug = name
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '');
+		if (slug === '') {
+			errorText = 'Give the conversation a name with letters or numbers.';
+			return;
+		}
+		try {
+			const res = await fetch('/api/conversations', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ name, slug })
+			});
+			if (!res.ok) {
+				errorText =
+					res.status === 409
+						? 'A conversation with that name already exists.'
+						: `Could not create the conversation (HTTP ${res.status}).`;
+				return;
+			}
+			const created = (await res.json()) as Conversation;
+			creatingConversation = false;
+			newConvName = '';
+			errorText = '';
+			await loadConversations();
+			selectConversation(created.slug);
+		} catch {
+			errorText = 'Could not create the conversation — network error.';
+		}
+	}
+
 	async function send() {
 		const body = draft.trim();
 		if (body === '' || senderId === '' || sending) return;
@@ -282,7 +320,39 @@
 					#{conversation.slug}
 				</button>
 			{/each}
+			<button
+				type="button"
+				class="conv-tab conv-new"
+				title="New conversation"
+				onclick={() => (creatingConversation = true)}
+			>
+				+
+			</button>
 		</nav>
+		{#if creatingConversation}
+			<form
+				class="new-conv"
+				onsubmit={(e) => {
+					e.preventDefault();
+					createConversation();
+				}}
+			>
+				<input
+					type="text"
+					placeholder="New conversation name"
+					bind:value={newConvName}
+					autocomplete="off"
+				/>
+				<button type="submit">Create</button>
+				<button
+					type="button"
+					onclick={() => {
+						creatingConversation = false;
+						newConvName = '';
+					}}>Cancel</button
+				>
+			</form>
+		{/if}
 		<form
 			class="search"
 			onsubmit={(e) => {
@@ -456,6 +526,27 @@
 		background: #2563eb;
 		border-color: #2563eb;
 		color: #ffffff;
+	}
+
+	.conv-new {
+		font-weight: 700;
+	}
+
+	.new-conv {
+		display: flex;
+		gap: 0.4rem;
+		margin-top: 0.5rem;
+	}
+
+	.new-conv input {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.85rem;
+	}
+
+	.new-conv button {
+		font-size: 0.8rem;
+		cursor: pointer;
 	}
 
 	.search {

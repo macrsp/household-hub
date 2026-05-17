@@ -130,6 +130,9 @@ when each is reached.
   receives Twilio status callbacks and updates the matching `deliveries` row,
   so a receipt reflects the real carrier outcome (`delivered` / `failed`), not
   just "handed to Twilio".
+- [ ] **M18 — Create conversations from the UI.** `POST /api/conversations`
+  creates a conversation and adds every household member as a participant
+  atomically; the conversation tab bar gets a `+` button to create one.
 
 ## Surprises & Discoveries
 
@@ -447,6 +450,24 @@ which verifies the Twilio request signature and requires `MessageSid` and
 and exercised by `sms.test.ts`. No new try/catch around a user-asset write is
 introduced — the single UPDATE is awaited directly; a failure 500s and Twilio
 retries.
+
+**M18 — Create conversations from the UI.** Conversations and participants
+were seed-only; M18 makes them runtime-creatable. `POST /api/conversations`
+validates a `{ name, slug }` body (slug: lowercase alphanumeric + hyphens,
+unique — 409 on collision), then creates the conversation and adds every
+current household member as a participant. `+page.svelte` adds a `+` button to
+the conversation tab bar that opens an inline name field; on create it
+switches to the new conversation. The web app derives the slug from the name.
+
+User-Asset Write-Path Checklist (M18): the touched classes are `conversations`
+and `participants` — their first runtime write path. The write path is the
+single typed helper `createConversationWithParticipants` in `db.ts`, which
+runs the conversation INSERT and the participant INSERTs in one `db.batch()`
+transaction — so a conversation can never exist with a partial participant
+set, which is why no per-iteration try/catch is needed (the batch is
+all-or-nothing). The server gate is the `POST` handler: it validates the name
+and the slug shape and rejects a duplicate slug (409). No silent fallback —
+a batch failure throws and the route returns 500.
 
 ## Concrete Steps
 
