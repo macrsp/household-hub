@@ -778,6 +778,9 @@
 				<button type="button" onclick={toggleArchive}>
 					{activeConversation.archived_at ? 'Unarchive' : 'Archive'}
 				</button>
+				<a class="manage-export" href="/api/conversations/{activeSlug}/export" download>
+					Export
+				</a>
 				<button type="button" onclick={closeManage}>Done</button>
 			</form>
 		{/if}
@@ -1067,6 +1070,17 @@
 	.new-conv button,
 	.manage-conv button {
 		font-size: 0.8rem;
+		cursor: pointer;
+	}
+
+	.manage-export {
+		font: inherit;
+		font-size: 0.8rem;
+		padding: 0.5rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 0.4rem;
+		color: var(--accent);
+		text-decoration: none;
 		cursor: pointer;
 	}
 
