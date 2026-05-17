@@ -206,6 +206,9 @@
 		openStream();
 		loadPrefs();
 		markRead(slug);
+		// The previous thread's draft was persisted on every keystroke; load
+		// the one belonging to the thread now being opened.
+		draft = loadDraft(slug);
 	}
 
 	// Fetch the page of messages older than the oldest one loaded and prepend
@@ -318,6 +321,26 @@
 		applyTheme();
 	}
 
+	// Per-conversation draft persistence (M26): the unsent composer text is
+	// kept in localStorage under hh-draft-<slug>, so switching threads or
+	// reloading the page never loses what was typed.
+	function saveDraft(slug: string) {
+		try {
+			if (draft.trim() === '') localStorage.removeItem(`hh-draft-${slug}`);
+			else localStorage.setItem(`hh-draft-${slug}`, draft);
+		} catch {
+			// localStorage unavailable — the in-memory draft still works
+		}
+	}
+
+	function loadDraft(slug: string): string {
+		try {
+			return localStorage.getItem(`hh-draft-${slug}`) ?? '';
+		} catch {
+			return '';
+		}
+	}
+
 	async function send() {
 		const body = draft.trim();
 		if (body === '' || senderId === '' || sending) return;
@@ -339,6 +362,7 @@
 			const senderName = people.find((p) => p.id === senderId)?.display_name ?? '';
 			addMessage({ ...created, author_name: senderName });
 			draft = '';
+			saveDraft(activeSlug);
 		} catch {
 			errorText = 'Could not send — network error.';
 		} finally {
@@ -496,6 +520,7 @@
 		} catch {
 			// ignore
 		}
+		draft = loadDraft(activeSlug);
 		loadPeople();
 		loadConversations();
 		openStream();
@@ -706,6 +731,7 @@
 			placeholder="Message #{activeSlug}…"
 			bind:value={draft}
 			onkeydown={onKeydown}
+			oninput={() => saveDraft(activeSlug)}
 			autocomplete="off"
 		/>
 		<button type="submit" disabled={sending || draft.trim() === '' || senderId === ''}>

@@ -156,6 +156,9 @@ when each is reached.
 - [ ] **M25 — Clickable links in messages.** URLs in a message body render as
   clickable links that open in a new tab; the body is split into safe text and
   link segments — no raw HTML — so no message can inject markup.
+- [ ] **M26 — Per-conversation draft persistence.** An unsent message is kept
+  per conversation in `localStorage`, so switching threads or reloading the
+  page no longer loses what was typed.
 
 ## Surprises & Discoveries
 
@@ -611,6 +614,15 @@ its `href`/text bound as attributes/text — never `{@html}` — so a message bo
 can never inject markup. Links open in a new tab with `rel="noopener
 noreferrer"`. `white-space: pre-wrap` on `.body` still preserves newlines
 because each text segment keeps its literal whitespace.
+
+**M26 — Per-conversation draft persistence.** Purely a `+page.svelte` change —
+no API, database, or write path is touched, so no Write-Path Checklist.
+`saveDraft(slug)` writes the composer's current text to `localStorage` under
+`hh-draft-<slug>` (or removes the key when the draft is empty); `loadDraft(slug)`
+reads it back. The composer input persists on every `oninput`, so closing the
+tab mid-sentence loses nothing; `selectConversation` loads the target thread's
+draft on switch; `onMount` loads the initial thread's draft; a successful send
+clears both the in-memory draft and the stored key.
 
 ## Concrete Steps
 
