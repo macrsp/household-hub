@@ -133,6 +133,9 @@ when each is reached.
 - [ ] **M18 — Create conversations from the UI.** `POST /api/conversations`
   creates a conversation and adds every household member as a participant
   atomically; the conversation tab bar gets a `+` button to create one.
+- [ ] **M19 — Installable PWA.** A web app manifest, an SVG icon,
+  theme-colour and Apple meta tags, and a minimal service worker that caches
+  the built app shell — so household-hub can be installed to a home screen.
 
 ## Surprises & Discoveries
 
@@ -468,6 +471,15 @@ set, which is why no per-iteration try/catch is needed (the batch is
 all-or-nothing). The server gate is the `POST` handler: it validates the name
 and the slug shape and rejects a duplicate slug (409). No silent fallback —
 a batch failure throws and the route returns 500.
+
+**M19 — Installable PWA.** The app was named a PWA but was never installable.
+M19 adds `static/manifest.webmanifest` (name, `standalone` display,
+theme/background colours), `static/icon.svg` (a household-hub mark), the
+`<link rel="manifest">` / `theme-color` / Apple meta tags in `app.html`, and
+`src/service-worker.ts` — a deliberately narrow service worker that caches
+only the built shell (`build` + `files`) and leaves pages, `/api/*`, and the
+SSE stream entirely to the network, so an installed copy never shows stale
+data. No API, database, or write path is touched.
 
 ## Concrete Steps
 

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Household Hub">
+  <rect width="512" height="512" rx="104" fill="#2563eb" />
+  <path
+    d="M140 150h232a44 44 0 0 1 44 44v124a44 44 0 0 1-44 44H252l-78 58v-58h-34a44 44 0 0 1-44-44V194a44 44 0 0 1 44-44z"
+    fill="#ffffff"
+  />
+</svg>

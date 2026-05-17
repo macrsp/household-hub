@@ -1,0 +1,18 @@
+{
+	"name": "Household Hub",
+	"short_name": "Household Hub",
+	"description": "A small household communication relay — one conversation across web, SMS, and email.",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#f4f4f5",
+	"theme_color": "#2563eb",
+	"icons": [
+		{
+			"src": "/icon.svg",
+			"type": "image/svg+xml",
+			"sizes": "any",
+			"purpose": "any"
+		}
+	]
+}
