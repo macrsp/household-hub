@@ -421,6 +421,38 @@
 		}
 	}
 
+	// Split a message body into plain-text and link segments so URLs render as
+	// clickable links. Each segment is later bound as a text node or an <a>
+	// attribute — never {@html} — so a message body can never inject markup.
+	function linkify(text: string): Array<{ link: boolean; value: string; href: string }> {
+		const segments: Array<{ link: boolean; value: string; href: string }> = [];
+		const re = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+		let last = 0;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(text)) !== null) {
+			if (m.index > last) {
+				segments.push({ link: false, value: text.slice(last, m.index), href: '' });
+			}
+			let url = m[0];
+			let trail = '';
+			// Trailing sentence punctuation is almost never part of the URL.
+			while (/[.,!?;:)\]]$/.test(url)) {
+				trail = url.slice(-1) + trail;
+				url = url.slice(0, -1);
+			}
+			if (url) {
+				const href = /^www\./i.test(url) ? `https://${url}` : url;
+				segments.push({ link: true, value: url, href });
+			}
+			if (trail) segments.push({ link: false, value: trail, href: '' });
+			last = m.index + m[0].length;
+		}
+		if (last < text.length) {
+			segments.push({ link: false, value: text.slice(last), href: '' });
+		}
+		return segments;
+	}
+
 	function formatTime(iso: string): string {
 		return new Date(iso).toLocaleString([], {
 			month: 'short',
@@ -604,7 +636,7 @@
 							</div>
 						</form>
 					{:else}
-						<p class="body">{message.body}</p>
+						<p class="body">{#each linkify(message.body) as seg}{#if seg.link}<a href={seg.href} target="_blank" rel="noopener noreferrer">{seg.value}</a>{:else}{seg.value}{/if}{/each}</p>
 						{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
 							<p class="receipt">
 								{#if (message.delivery_failed ?? 0) > 0}
@@ -885,6 +917,10 @@
 		margin: 0.25rem 0 0;
 		white-space: pre-wrap;
 		word-break: break-word;
+	}
+
+	.body a {
+		color: var(--accent);
 	}
 
 	.receipt {
