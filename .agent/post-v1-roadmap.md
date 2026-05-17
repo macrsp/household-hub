@@ -126,6 +126,10 @@ when each is reached.
 - [ ] **M16 — Message search.** `GET …/messages?q=<term>` matches message
   bodies; the conversation header gets a search box that shows matching
   messages with a results banner and a Clear button.
+- [ ] **M17 — SMS delivery-status callbacks.** `POST /api/webhooks/sms-status`
+  receives Twilio status callbacks and updates the matching `deliveries` row,
+  so a receipt reflects the real carrier outcome (`delivered` / `failed`), not
+  just "handed to Twilio".
 
 ## Surprises & Discoveries
 
@@ -424,6 +428,25 @@ fetches matches into a `searchResults` array and switches the message list
 into search mode, with a results banner and a Clear button; clearing the
 search or switching conversation returns to the live view. Read-only — no
 Write-Path Checklist.
+
+**M17 — SMS delivery-status callbacks.** `sendSms` now includes a
+`StatusCallback` URL (built from the `PUBLIC_APP_URL` var) when it posts to
+Twilio; Twilio then POSTs delivery-status updates to
+`POST /api/webhooks/sms-status`. That endpoint verifies the Twilio signature
+(when an auth token is set), maps the Twilio `MessageStatus` to a
+household-hub status via `mapTwilioStatus` (`delivered`, `failed`, or `sent`),
+and updates the `deliveries` row keyed by `provider_message_id` (the Twilio
+SID stored at send time). The M13 receipts then show the real carrier
+outcome instead of just "handed to Twilio".
+
+User-Asset Write-Path Checklist (M17): the touched class is `deliveries`. The
+write path is the new typed helper `updateDeliveryByProviderId` in `db.ts` —
+the sole place this UPDATE is issued. The server gate is the status webhook,
+which verifies the Twilio request signature and requires `MessageSid` and
+`MessageStatus`. `mapTwilioStatus`'s output set is declared in one function
+and exercised by `sms.test.ts`. No new try/catch around a user-asset write is
+introduced — the single UPDATE is awaited directly; a failure 500s and Twilio
+retries.
 
 ## Concrete Steps
 
