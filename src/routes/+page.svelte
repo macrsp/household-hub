@@ -276,6 +276,9 @@
 	{#if errorText}
 		<p class="error" role="alert">{errorText}</p>
 	{/if}
+	<footer class="legal">
+		<a href="/privacy">Privacy &amp; SMS terms</a>
+	</footer>
 </main>
 
 <style>
@@ -458,5 +461,15 @@
 		height: 1px;
 		overflow: hidden;
 		clip: rect(0 0 0 0);
+	}
+
+	.legal {
+		padding: 0.5rem 1.25rem 0.75rem;
+		font-size: 0.7rem;
+		text-align: center;
+	}
+
+	.legal a {
+		color: #a1a1aa;
 	}
 </style>
