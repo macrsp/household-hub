@@ -149,6 +149,10 @@ when each is reached.
   reports each thread's latest message time; the conversation tab bar shows an
   unread dot on any thread with activity newer than the device last viewed it,
   with the last-viewed time kept per conversation in `localStorage`.
+- [ ] **M24 — Message editing.** An `edited_at` column lets a member correct a
+  message they sent; the canonical body is replaced in place, the app shows an
+  "(edited)" marker, and the SSE stream propagates the edit to every open
+  client. A deleted message cannot be edited.
 
 ## Surprises & Discoveries
 
@@ -560,6 +564,39 @@ thread. The active conversation is stamped read on selection and again each
 time a new message streams in, so it never shows its own dot. The conversation
 list is re-fetched on a modest interval (so other threads' activity surfaces
 without opening them), reusing the existing `loadConversations()`.
+
+**M24 — Message editing.** A household member can correct a message they sent.
+Migration `0004_message_editing.sql` adds a nullable `edited_at` column to
+`messages` (NULL = never edited). The write path is the typed helper
+`editMessage` in `db.ts`, whose `UPDATE … SET body = ?, edited_at = ? WHERE
+id = ? AND author_person_id = ? AND deleted_at IS NULL` scopes the write to
+the author and refuses to edit a retracted message. The route gains a
+`PATCH /api/conversations/[slug]/messages/[id]` handler taking
+`{ personId, body }`: 404 for an unknown message, 403 for a non-author, 409
+for a deleted message, 400 for an empty body. Read paths (the messages list
+and the SSE stream) expose `edited_at`; the stream's de-dup marker becomes
+`<deleted_at>|<edited_at>` so an edit re-emits the row to every open client.
+`+page.svelte` adds an inline editor (an Edit button beside Delete opens a
+textarea with Save/Cancel) and shows an "(edited)" marker next to the
+timestamp. `scripts/probe-d1.mjs` gains a `messages` probe: zero rows with
+`edited_at` earlier than `created_at`. Editing affects only the canonical
+record and the app — copies already fanned out over SMS/email are unaffected,
+the same accepted tradeoff as M22.
+
+User-Asset Write-Path Checklist (M24): the touched class is `messages`. The
+write path is the single typed helper `editMessage` in `src/lib/server/db.ts`;
+the server gate is the `PATCH` handler in
+`src/routes/api/conversations/[slug]/messages/[id]/+server.ts`, which validates
+the `{ personId, body }` shape, requires the message to exist in the
+conversation (404), requires the caller to be the author (403), and refuses a
+deleted message (409). No new string set is introduced, so no parity test is
+needed. The post-deploy probe for the new state is the `messages — edited_at
+earlier than created_at` query added to `scripts/probe-d1.mjs`. A real-auth
+round-trip was exercised against `wrangler pages dev` (403 non-author, 409 on
+a deleted message, 200 author edit, `edited_at` set, body replaced) — recorded
+under Outcomes. No new try/catch wraps the write: the `PATCH` handler lets a
+failed write throw to a 500 (no silent fallback), and `editMessage` is a
+single statement with no loop.
 
 ## Concrete Steps
 

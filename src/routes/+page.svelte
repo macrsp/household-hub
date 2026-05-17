@@ -27,6 +27,9 @@
 		// Soft-deletion (M22): set once the author retracts the message; the
 		// server blanks the body and the view shows a tombstone in its place.
 		deleted_at?: string | null;
+		// Editing (M24): set once the author edits the message; the view shows
+		// an "(edited)" marker next to the timestamp.
+		edited_at?: string | null;
 	}
 	interface Prefs {
 		muted: boolean;
@@ -58,6 +61,10 @@
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	let theme = $state<'auto' | 'light' | 'dark'>('auto');
+	// Inline message editing (M24): the id of the message being edited (or '')
+	// and the working copy of its text.
+	let editingId = $state('');
+	let editDraft = $state('');
 	// Per-conversation last-viewed timestamps (slug -> ISO), mirrored from
 	// localStorage — drives the unread dot on each conversation tab (M23).
 	let readState = $state<Record<string, string>>({});
@@ -365,6 +372,47 @@
 		}
 	}
 
+	// Open the inline editor for one of the active sender's own messages.
+	function startEdit(message: Message) {
+		if (message.author_person_id !== senderId || message.deleted_at) return;
+		editingId = message.id;
+		editDraft = message.body;
+	}
+
+	function cancelEdit() {
+		editingId = '';
+		editDraft = '';
+	}
+
+	// Save an edited message body. An unchanged or empty draft just closes the
+	// editor; otherwise PATCH the message and update it locally — the SSE
+	// stream re-emits it to other clients.
+	async function saveEdit(message: Message) {
+		const body = editDraft.trim();
+		if (body === '' || body === message.body) {
+			cancelEdit();
+			return;
+		}
+		errorText = '';
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/messages/${message.id}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ personId: senderId, body })
+			});
+			if (!res.ok) {
+				errorText = `Could not edit (HTTP ${res.status}).`;
+				return;
+			}
+			const patch = { body, edited_at: new Date().toISOString() };
+			messages = messages.map((m) => (m.id === message.id ? { ...m, ...patch } : m));
+			searchResults = searchResults.map((m) => (m.id === message.id ? { ...m, ...patch } : m));
+			cancelEdit();
+		} catch {
+			errorText = 'Could not edit — network error.';
+		}
+	}
+
 	function onKeydown(event: KeyboardEvent) {
 		// Enter sends; Shift+Enter is a newline.
 		if (event.key === 'Enter' && !event.shiftKey) {
@@ -535,9 +583,26 @@
 							{message.source_transport}
 						</span>
 						<span class="time">{formatTime(message.created_at)}</span>
+						{#if message.edited_at && !message.deleted_at}
+							<span class="edited" title="edited {formatTime(message.edited_at)}">(edited)</span>
+						{/if}
 					</div>
 					{#if message.deleted_at}
 						<p class="body deleted">Message deleted</p>
+					{:else if editingId === message.id}
+						<form
+							class="edit-form"
+							onsubmit={(e) => {
+								e.preventDefault();
+								saveEdit(message);
+							}}
+						>
+							<textarea bind:value={editDraft} rows="2"></textarea>
+							<div class="edit-actions">
+								<button type="submit">Save</button>
+								<button type="button" onclick={cancelEdit}>Cancel</button>
+							</div>
+						</form>
 					{:else}
 						<p class="body">{message.body}</p>
 						{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
@@ -552,13 +617,14 @@
 							</p>
 						{/if}
 						{#if message.author_person_id === senderId}
-							<button
-								type="button"
-								class="delete-btn"
-								onclick={() => deleteMessage(message)}
-							>
-								Delete
-							</button>
+							<div class="msg-actions">
+								<button type="button" class="action-btn" onclick={() => startEdit(message)}>
+									Edit
+								</button>
+								<button type="button" class="action-btn" onclick={() => deleteMessage(message)}>
+									Delete
+								</button>
+							</div>
 						{/if}
 					{/if}
 				</article>
@@ -832,9 +898,19 @@
 		color: var(--faint);
 	}
 
-	.delete-btn {
-		display: block;
-		margin: 0.3rem 0 0 auto;
+	.edited {
+		color: var(--faint);
+		font-style: italic;
+	}
+
+	.msg-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.35rem;
+		margin-top: 0.3rem;
+	}
+
+	.action-btn {
 		font: inherit;
 		font-size: 0.66rem;
 		padding: 0.1rem 0.45rem;
@@ -842,6 +918,35 @@
 		border-radius: 0.3rem;
 		background: var(--surface);
 		color: var(--dim);
+		cursor: pointer;
+	}
+
+	.edit-form {
+		margin-top: 0.25rem;
+	}
+
+	.edit-form textarea {
+		width: 100%;
+		box-sizing: border-box;
+		resize: vertical;
+		font: inherit;
+		border: 1px solid var(--border-strong);
+		border-radius: 0.4rem;
+		padding: 0.4rem 0.5rem;
+		background: var(--surface);
+		color: var(--text);
+	}
+
+	.edit-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.35rem;
+		margin-top: 0.3rem;
+	}
+
+	.edit-actions button {
+		font-size: 0.72rem;
+		padding: 0.2rem 0.6rem;
 		cursor: pointer;
 	}
 

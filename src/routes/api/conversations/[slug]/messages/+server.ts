@@ -43,12 +43,13 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 	// them ascending for display.
 	const { results } = await db
 		.prepare(
-			`SELECT id, body, source_transport, created_at, deleted_at, author_person_id, author_name,
+			`SELECT id, body, source_transport, created_at, deleted_at, edited_at,
+			        author_person_id, author_name,
 			        delivery_total, delivery_ok, delivery_failed
 			 FROM (
 			   SELECT m.id,
 			          CASE WHEN m.deleted_at IS NOT NULL THEN '' ELSE m.body END AS body,
-			          m.source_transport, m.created_at, m.deleted_at,
+			          m.source_transport, m.created_at, m.deleted_at, m.edited_at,
 			          m.author_person_id, p.display_name AS author_name,
 			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
 			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
