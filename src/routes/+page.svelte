@@ -21,6 +21,9 @@
 		delivery_total?: number;
 		delivery_ok?: number;
 		delivery_failed?: number;
+		// Soft-deletion (M22): set once the author retracts the message; the
+		// server blanks the body and the view shows a tombstone in its place.
+		deleted_at?: string | null;
 	}
 	interface Prefs {
 		muted: boolean;
@@ -85,10 +88,16 @@
 		}
 	}
 
-	// Append one message, de-duplicating by id — the stream re-sends the
-	// recent backlog on connect, and a sent message is added optimistically.
+	// Upsert one message by id. A new message is appended (and scrolled to);
+	// an id already on screen is merged in place — the stream re-emits a
+	// message when its deletion state changes, so this is how a soft-delete
+	// from another client turns an existing message into a tombstone.
 	function addMessage(message: Message) {
-		if (messages.some((m) => m.id === message.id)) return;
+		const idx = messages.findIndex((m) => m.id === message.id);
+		if (idx !== -1) {
+			messages = messages.map((m, i) => (i === idx ? { ...m, ...message } : m));
+			return;
+		}
 		messages = [...messages, message];
 		tick().then(() => listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 }));
 	}
@@ -285,6 +294,32 @@
 		}
 	}
 
+	// Soft-delete one of the active sender's own messages. The server stamps
+	// deleted_at and keeps the row; the SSE stream propagates the tombstone to
+	// other clients, but we also mark it locally so the change is immediate.
+	async function deleteMessage(message: Message) {
+		if (message.author_person_id !== senderId || message.deleted_at) return;
+		if (!confirm('Delete this message? It will be replaced with “Message deleted” for everyone.'))
+			return;
+		errorText = '';
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/messages/${message.id}`, {
+				method: 'DELETE',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ personId: senderId })
+			});
+			if (!res.ok) {
+				errorText = `Could not delete (HTTP ${res.status}).`;
+				return;
+			}
+			const tombstone = { deleted_at: new Date().toISOString(), body: '' };
+			messages = messages.map((m) => (m.id === message.id ? { ...m, ...tombstone } : m));
+			searchResults = searchResults.filter((m) => m.id !== message.id);
+		} catch {
+			errorText = 'Could not delete — network error.';
+		}
+	}
+
 	function onKeydown(event: KeyboardEvent) {
 		// Enter sends; Shift+Enter is a newline.
 		if (event.key === 'Enter' && !event.shiftKey) {
@@ -449,17 +484,30 @@
 						</span>
 						<span class="time">{formatTime(message.created_at)}</span>
 					</div>
-					<p class="body">{message.body}</p>
-					{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
-						<p class="receipt">
-							{#if (message.delivery_failed ?? 0) > 0}
-								⚠ sent to {message.delivery_ok}, failed for {message.delivery_failed}
-							{:else if (message.delivery_ok ?? 0) < (message.delivery_total ?? 0)}
-								sending… ({message.delivery_ok}/{message.delivery_total})
-							{:else}
-								✓ sent to {message.delivery_total}
-							{/if}
-						</p>
+					{#if message.deleted_at}
+						<p class="body deleted">Message deleted</p>
+					{:else}
+						<p class="body">{message.body}</p>
+						{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
+							<p class="receipt">
+								{#if (message.delivery_failed ?? 0) > 0}
+									⚠ sent to {message.delivery_ok}, failed for {message.delivery_failed}
+								{:else if (message.delivery_ok ?? 0) < (message.delivery_total ?? 0)}
+									sending… ({message.delivery_ok}/{message.delivery_total})
+								{:else}
+									✓ sent to {message.delivery_total}
+								{/if}
+							</p>
+						{/if}
+						{#if message.author_person_id === senderId}
+							<button
+								type="button"
+								class="delete-btn"
+								onclick={() => deleteMessage(message)}
+							>
+								Delete
+							</button>
+						{/if}
 					{/if}
 				</article>
 			{/each}
@@ -715,6 +763,24 @@
 		margin: 0.3rem 0 0;
 		font-size: 0.68rem;
 		color: var(--faint);
+	}
+
+	.body.deleted {
+		font-style: italic;
+		color: var(--faint);
+	}
+
+	.delete-btn {
+		display: block;
+		margin: 0.3rem 0 0 auto;
+		font: inherit;
+		font-size: 0.66rem;
+		padding: 0.1rem 0.45rem;
+		border: 1px solid var(--border);
+		border-radius: 0.3rem;
+		background: var(--surface);
+		color: var(--dim);
+		cursor: pointer;
 	}
 
 	.day-divider {

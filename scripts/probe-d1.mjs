@@ -43,6 +43,12 @@ const PROBES = [
 			'OR conversation_id NOT IN (SELECT id FROM conversations)'
 	},
 	{
+		name: 'messages — deleted_at earlier than created_at',
+		sql:
+			'SELECT count(*) AS n FROM messages ' +
+			'WHERE deleted_at IS NOT NULL AND deleted_at < created_at'
+	},
+	{
 		name: 'deliveries — dangling message_id / endpoint_id',
 		sql:
 			'SELECT count(*) AS n FROM deliveries ' +

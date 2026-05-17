@@ -31,7 +31,8 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 	let filterClause = '';
 	const binds: string[] = [conversationId];
 	if (q) {
-		filterClause = 'AND m.body LIKE ?';
+		// Search never matches a deleted message — its body is retracted.
+		filterClause = 'AND m.deleted_at IS NULL AND m.body LIKE ?';
 		binds.push(`%${q}%`);
 	} else if (before) {
 		filterClause = 'AND m.created_at < ?';
@@ -42,10 +43,12 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 	// them ascending for display.
 	const { results } = await db
 		.prepare(
-			`SELECT id, body, source_transport, created_at, author_person_id, author_name,
+			`SELECT id, body, source_transport, created_at, deleted_at, author_person_id, author_name,
 			        delivery_total, delivery_ok, delivery_failed
 			 FROM (
-			   SELECT m.id, m.body, m.source_transport, m.created_at,
+			   SELECT m.id,
+			          CASE WHEN m.deleted_at IS NOT NULL THEN '' ELSE m.body END AS body,
+			          m.source_transport, m.created_at, m.deleted_at,
 			          m.author_person_id, p.display_name AS author_name,
 			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
 			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
