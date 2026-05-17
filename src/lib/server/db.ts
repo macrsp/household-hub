@@ -26,6 +26,10 @@ export interface Message {
 	body: string;
 	source_transport: SourceTransport;
 	created_at: string;
+	// Soft-deletion (M22): NULL while live, an ISO 8601 string once the author
+	// retracts the message. The row is never DELETEd. Omitted on insert — a new
+	// message is always live, which the schema default (NULL) already gives.
+	deleted_at?: string | null;
 }
 
 export interface DeliveryRow {
@@ -49,6 +53,29 @@ export async function insertMessage(db: D1Database, m: Message): Promise<void> {
 		)
 		.bind(m.id, m.conversation_id, m.author_person_id, m.body, m.source_transport, m.created_at)
 		.run();
+}
+
+/**
+ * Soft-delete a message: stamp `deleted_at`, never remove the row. The author
+ * id is part of the WHERE clause, so only the message's own author can delete
+ * it, and `deleted_at IS NULL` makes a repeat delete a no-op. Returns true if
+ * exactly this UPDATE flipped a live message to deleted — the caller has
+ * already confirmed the message exists and the caller is its author, so a
+ * false return means the message was already deleted.
+ */
+export async function softDeleteMessage(
+	db: D1Database,
+	messageId: string,
+	authorPersonId: string
+): Promise<boolean> {
+	const res = await db
+		.prepare(
+			`UPDATE messages SET deleted_at = ?
+			 WHERE id = ? AND author_person_id = ? AND deleted_at IS NULL`
+		)
+		.bind(nowIso(), messageId, authorPersonId)
+		.run();
+	return (res.meta.changes ?? 0) > 0;
 }
 
 /** Insert one delivery attempt row (typically with status 'pending'). */

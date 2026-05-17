@@ -29,18 +29,23 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 
 	const stream = new ReadableStream({
 		async start(controller) {
-			// Ids already sent on this connection — so each message goes out once.
-			const seen = new Set<string>();
+			// Messages already sent on this connection, id -> deletion marker
+			// ('' while live, the deleted_at string once retracted). A message
+			// is (re-)emitted when it is new OR its deletion marker changed —
+			// so a soft-delete reaches every open client, not just the deleter.
+			const seen = new Map<string, string>();
 			controller.enqueue(encoder.encode(': connected\n\n'));
 
 			while (open) {
 				try {
 					const { results } = await db
 						.prepare(
-							`SELECT id, body, source_transport, created_at, author_person_id, author_name,
+							`SELECT id, body, source_transport, created_at, deleted_at, author_person_id, author_name,
 							        delivery_total, delivery_ok, delivery_failed
 							 FROM (
-							   SELECT m.id, m.body, m.source_transport, m.created_at,
+							   SELECT m.id,
+							          CASE WHEN m.deleted_at IS NOT NULL THEN '' ELSE m.body END AS body,
+							          m.source_transport, m.created_at, m.deleted_at,
 							          m.author_person_id, p.display_name AS author_name,
 							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
 							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
@@ -61,8 +66,9 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 					let emitted = 0;
 					for (const row of results) {
 						const id = row.id as string;
-						if (seen.has(id)) continue;
-						seen.add(id);
+						const marker = (row.deleted_at as string | null) ?? '';
+						if (seen.get(id) === marker) continue;
+						seen.set(id, marker);
 						controller.enqueue(encoder.encode(`data: ${JSON.stringify(row)}\n\n`));
 						emitted++;
 					}

@@ -141,6 +141,10 @@ when each is reached.
 - [ ] **M21 — Dark mode.** Theme colours move to CSS custom properties; the app
   follows `prefers-color-scheme` and offers an Auto/Light/Dark toggle that
   persists in `localStorage`.
+- [ ] **M22 — Message soft-deletion.** A `deleted_at` column lets a member
+  retract their own message; the canonical row is kept, read paths blank the
+  body and show a "Message deleted" tombstone, and the SSE stream propagates
+  the retraction to every open client.
 
 ## Surprises & Discoveries
 
@@ -504,6 +508,40 @@ in `<head>` reads `localStorage['hh-theme']` and sets `documentElement.dataset
 `var(--…)` reference; `+page.svelte` adds a titlebar theme toggle that cycles
 Auto → Light → Dark, calls `applyTheme()`, and writes the choice back to
 `localStorage`.
+
+**M22 — Message soft-deletion.** A household member can retract a message they
+sent. Deletion is a soft state, never a `DELETE`: migration
+`0003_message_soft_delete.sql` adds a nullable `deleted_at` column to
+`messages` (NULL = live). The write path is the typed helper
+`softDeleteMessage` in `db.ts`, whose `UPDATE … WHERE id = ? AND
+author_person_id = ? AND deleted_at IS NULL` both scopes the write to the
+author and makes a repeat delete a no-op. A new route
+`DELETE /api/conversations/[slug]/messages/[id]` takes `{ personId }`, 404s an
+unknown message, 403s a non-author, then calls the helper and returns an
+idempotent result. Read paths blank the body of a deleted message in SQL
+(`CASE WHEN deleted_at IS NOT NULL THEN ''`) and expose `deleted_at`: the
+messages list and the SSE stream both do this, and `?q=` search excludes
+deleted messages entirely. The stream's de-dup map is keyed id → deletion
+marker, so a retraction re-emits the row to every open client (within the
+recent-100 window — older retractions show on reload). `+page.svelte` upserts
+streamed messages by id, renders a "Message deleted" tombstone, and gives the
+author a small Delete button. `scripts/probe-d1.mjs` gains a `messages` probe:
+zero rows with `deleted_at` earlier than `created_at`.
+
+User-Asset Write-Path Checklist (M22): the touched class is `messages`. The
+write path is the single typed helper `softDeleteMessage` in
+`src/lib/server/db.ts`; the server gate is the `DELETE` handler in
+`src/routes/api/conversations/[slug]/messages/[id]/+server.ts`, which validates
+the `personId` body, requires the message to exist in the conversation (404),
+and requires the caller to be the author (403) before any write. No new string
+set is introduced, so no parity test is needed. The post-deploy probe for the
+new state is the `messages — deleted_at earlier than created_at` query added to
+`scripts/probe-d1.mjs`, run by the existing probe lane against the deployed
+database. A real-auth round-trip was exercised against `wrangler pages dev`
+(403 for a non-author, 200 for the author, idempotent repeat, body blanked,
+search miss) — recorded under Outcomes. No new try/catch wraps the write: the
+`DELETE` handler lets a failed write throw to a 500 (no silent fallback), and
+`softDeleteMessage` is a single statement with no loop.
 
 ## Concrete Steps
 
