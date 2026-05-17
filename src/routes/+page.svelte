@@ -13,6 +13,9 @@
 		// Timestamp of the newest readable message, or null for an empty
 		// thread — compared against the per-device last-viewed time (M23).
 		last_message_at?: string | null;
+		// Set once the conversation is archived (M27): archived threads are
+		// kept out of the tab bar unless the archived list is revealed.
+		archived_at?: string | null;
 	}
 	interface Message {
 		id: string;
@@ -60,6 +63,11 @@
 	let lastSearch = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
+	// Conversation management (M27): the manage panel for the active thread,
+	// the working copy of its name, and whether archived threads are revealed.
+	let managingConversation = $state(false);
+	let renameInput = $state('');
+	let showArchived = $state(false);
 	let theme = $state<'auto' | 'light' | 'dark'>('auto');
 	// Inline message editing (M24): the id of the message being edited (or '')
 	// and the working copy of its text.
@@ -70,6 +78,10 @@
 	let readState = $state<Record<string, string>>({});
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
+	// Conversations split by archived state (M27).
+	const activeConversations = $derived(conversations.filter((c) => !c.archived_at));
+	const archivedConversations = $derived(conversations.filter((c) => c.archived_at));
+	const activeConversation = $derived(conversations.find((c) => c.slug === activeSlug));
 	let listEl: HTMLElement | undefined = $state();
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
@@ -301,6 +313,58 @@
 			selectConversation(created.slug);
 		} catch {
 			errorText = 'Could not create the conversation — network error.';
+		}
+	}
+
+	// Conversation management (M27): rename and archive the active thread.
+	function openManage() {
+		renameInput = activeConversation?.name ?? '';
+		managingConversation = true;
+	}
+
+	function closeManage() {
+		managingConversation = false;
+	}
+
+	// PATCH the active conversation, then refresh the list. Returns success.
+	async function patchConversation(body: { name?: string; archived?: boolean }): Promise<boolean> {
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (!res.ok) {
+				errorText = `Could not update the conversation (HTTP ${res.status}).`;
+				return false;
+			}
+			errorText = '';
+			await loadConversations();
+			return true;
+		} catch {
+			errorText = 'Could not update the conversation — network error.';
+			return false;
+		}
+	}
+
+	async function renameConversation() {
+		const name = renameInput.trim();
+		if (name === '' || name === activeConversation?.name) {
+			closeManage();
+			return;
+		}
+		if (await patchConversation({ name })) closeManage();
+	}
+
+	// Archive or un-archive the active thread. Archiving the thread currently
+	// on screen drops it from the tab bar, so switch to another active one.
+	async function toggleArchive() {
+		const archiving = !activeConversation?.archived_at;
+		if (!(await patchConversation({ archived: archiving }))) return;
+		closeManage();
+		if (archiving) {
+			const next = conversations.find((c) => !c.archived_at);
+			if (next) selectConversation(next.slug);
 		}
 	}
 
@@ -545,7 +609,7 @@
 			</button>
 		</div>
 		<nav class="conversations" aria-label="Conversations">
-			{#each conversations as conversation (conversation.id)}
+			{#each activeConversations as conversation (conversation.id)}
 				<button
 					type="button"
 					class="conv-tab"
@@ -559,6 +623,19 @@
 					{/if}
 				</button>
 			{/each}
+			{#if showArchived}
+				{#each archivedConversations as conversation (conversation.id)}
+					<button
+						type="button"
+						class="conv-tab conv-archived"
+						class:active={conversation.slug === activeSlug}
+						aria-current={conversation.slug === activeSlug ? 'true' : undefined}
+						onclick={() => selectConversation(conversation.slug)}
+					>
+						#{conversation.slug}
+					</button>
+				{/each}
+			{/if}
 			<button
 				type="button"
 				class="conv-tab conv-new"
@@ -567,6 +644,20 @@
 			>
 				+
 			</button>
+			{#if activeConversation}
+				<button type="button" class="conv-tab conv-manage" onclick={openManage}>
+					Manage
+				</button>
+			{/if}
+			{#if archivedConversations.length > 0}
+				<button
+					type="button"
+					class="conv-tab conv-archived-toggle"
+					onclick={() => (showArchived = !showArchived)}
+				>
+					{showArchived ? 'Hide archived' : `Archived (${archivedConversations.length})`}
+				</button>
+			{/if}
 		</nav>
 		{#if creatingConversation}
 			<form
@@ -590,6 +681,27 @@
 						newConvName = '';
 					}}>Cancel</button
 				>
+			</form>
+		{/if}
+		{#if managingConversation && activeConversation}
+			<form
+				class="manage-conv"
+				onsubmit={(e) => {
+					e.preventDefault();
+					renameConversation();
+				}}
+			>
+				<input
+					type="text"
+					placeholder="Conversation name"
+					bind:value={renameInput}
+					autocomplete="off"
+				/>
+				<button type="submit">Rename</button>
+				<button type="button" onclick={toggleArchive}>
+					{activeConversation.archived_at ? 'Unarchive' : 'Archive'}
+				</button>
+				<button type="button" onclick={closeManage}>Done</button>
 			</form>
 		{/if}
 		<form
@@ -825,6 +937,22 @@
 		font-weight: 700;
 	}
 
+	.conv-manage,
+	.conv-archived-toggle {
+		font-size: 0.72rem;
+		color: var(--dim);
+	}
+
+	.conv-archived {
+		font-style: italic;
+		color: var(--faint);
+		border-style: dashed;
+	}
+
+	.conv-archived.active {
+		color: var(--on-accent);
+	}
+
 	.unread-dot {
 		display: inline-block;
 		width: 0.4rem;
@@ -835,19 +963,23 @@
 		vertical-align: 0.05rem;
 	}
 
-	.new-conv {
+	.new-conv,
+	.manage-conv {
 		display: flex;
 		gap: 0.4rem;
 		margin-top: 0.5rem;
+		flex-wrap: wrap;
 	}
 
-	.new-conv input {
+	.new-conv input,
+	.manage-conv input {
 		flex: 1;
 		min-width: 0;
 		font-size: 0.85rem;
 	}
 
-	.new-conv button {
+	.new-conv button,
+	.manage-conv button {
 		font-size: 0.8rem;
 		cursor: pointer;
 	}

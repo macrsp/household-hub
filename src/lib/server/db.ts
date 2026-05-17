@@ -191,6 +191,36 @@ export async function updateDeliveryByProviderId(
 }
 
 /**
+ * Update a conversation's name and/or archived state. Archiving is a soft,
+ * reversible state — `archived: true` stamps `archived_at`, `archived: false`
+ * clears it back to NULL; the conversation row and all its messages and
+ * participants are kept either way. The runtime write path to a conversation
+ * row after creation.
+ */
+export async function updateConversation(
+	db: D1Database,
+	conversationId: string,
+	fields: { name?: string; archived?: boolean }
+): Promise<void> {
+	const sets: string[] = [];
+	const binds: Array<string | null> = [];
+	if (fields.name !== undefined) {
+		sets.push('name = ?');
+		binds.push(fields.name);
+	}
+	if (fields.archived !== undefined) {
+		sets.push('archived_at = ?');
+		binds.push(fields.archived ? nowIso() : null);
+	}
+	if (sets.length === 0) return;
+	binds.push(conversationId);
+	await db
+		.prepare(`UPDATE conversations SET ${sets.join(', ')} WHERE id = ?`)
+		.bind(...binds)
+		.run();
+}
+
+/**
  * Create a conversation and add the given people as its participants, in one
  * atomic D1 batch — so a conversation never exists with a partial set of
  * participants. The only runtime write path to `conversations` and

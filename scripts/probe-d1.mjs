@@ -29,6 +29,12 @@ const PROBES = [
 		sql: "SELECT count(*) AS n FROM conversations WHERE slug IS NULL OR slug = ''"
 	},
 	{
+		name: 'conversations — archived_at earlier than created_at',
+		sql:
+			'SELECT count(*) AS n FROM conversations ' +
+			'WHERE archived_at IS NOT NULL AND archived_at < created_at'
+	},
+	{
 		name: 'participants — dangling conversation_id / person_id',
 		sql:
 			'SELECT count(*) AS n FROM participants ' +

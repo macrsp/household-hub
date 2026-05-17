@@ -159,6 +159,10 @@ when each is reached.
 - [ ] **M26 — Per-conversation draft persistence.** An unsent message is kept
   per conversation in `localStorage`, so switching threads or reloading the
   page no longer loses what was typed.
+- [ ] **M27 — Conversation rename & archive.** `PATCH /api/conversations/[slug]`
+  renames a conversation and archives it (a soft, reversible state); the tab
+  bar keeps archived threads hidden behind a reveal toggle and gains a Manage
+  panel for the active thread.
 
 ## Surprises & Discoveries
 
@@ -623,6 +627,38 @@ reads it back. The composer input persists on every `oninput`, so closing the
 tab mid-sentence loses nothing; `selectConversation` loads the target thread's
 draft on switch; `onMount` loads the initial thread's draft; a successful send
 clears both the in-memory draft and the stored key.
+
+**M27 — Conversation rename & archive.** A conversation could be created (M18)
+but never renamed or tidied away. Migration `0005_conversation_archive.sql`
+adds a nullable `archived_at` column to `conversations` (NULL = active).
+Renaming is a plain update of the existing `name` column. The write path is
+the typed helper `updateConversation` in `db.ts`, which builds a dynamic
+`UPDATE` from a `{ name?, archived? }` patch (`archived: true` stamps
+`archived_at`, `archived: false` clears it — archiving is soft and reversible).
+A new route `PATCH /api/conversations/[slug]` validates the patch (400 on a
+blank name, a non-boolean `archived`, or an empty body), 404s an unknown slug,
+then applies it. `GET /api/conversations` now also returns `archived_at`.
+`+page.svelte` splits conversations into active and archived derived lists: the
+tab bar shows active threads, a Manage button opens an inline rename/archive
+panel for the active thread, and an `Archived (n)` toggle reveals archived
+tabs (dashed, italic). Archiving the thread on screen switches to another
+active one. `scripts/probe-d1.mjs` gains a `conversations` probe: zero rows
+with `archived_at` earlier than `created_at`.
+
+User-Asset Write-Path Checklist (M27): the touched class is `conversations`.
+The write path is the single typed helper `updateConversation` in
+`src/lib/server/db.ts`; the server gate is the `PATCH` handler in
+`src/routes/api/conversations/[slug]/+server.ts`, which validates the
+`{ name?, archived? }` shape, rejects a blank name or non-boolean `archived`
+(400), requires at least one field (400), and requires the conversation to
+exist (404). No new string set is introduced, so no parity test is needed. The
+post-deploy probe for the new state is the `conversations — archived_at
+earlier than created_at` query added to `scripts/probe-d1.mjs`. A real-auth
+round-trip was exercised against `wrangler pages dev` (rename, archive,
+unarchive, 400 on empty body / blank name, 404 on an unknown slug) — recorded
+under Outcomes. No new try/catch wraps the write: the `PATCH` handler lets a
+failed write throw to a 500 (no silent fallback), and `updateConversation`
+issues one statement with no loop.
 
 ## Concrete Steps
 

@@ -26,8 +26,8 @@ paths must follow the User-Asset Durability invariants.
 | --------------- | ------------------------------------------ | -------------------- |
 | `people`        | Household members                          | `seed.sql` only      |
 | `endpoints`     | A person's address on a transport          | `seed.sql` only      |
-| `conversations` | Conversation threads                       | `seed.sql` only      |
-| `participants`  | Person ↔ conversation membership           | `seed.sql` only      |
+| `conversations` | Conversation threads                       | runtime (create / rename / archive) |
+| `participants`  | Person ↔ conversation membership           | runtime (on create)  |
 | `messages`      | Canonical messages (the conversation)      | runtime (all routes) |
 | `deliveries`    | One row per fanout attempt to one endpoint | runtime (fanout)     |
 
@@ -53,7 +53,9 @@ run at least one "this should always be zero" query per class:
 
 - `people` — zero rows with a NULL or empty `display_name`.
 - `endpoints` — zero rows whose `person_id` is absent from `people`.
-- `conversations` — zero rows with a NULL or empty `slug`.
+- `conversations` — zero rows with a NULL or empty `slug`; and zero rows whose
+  `archived_at` is earlier than `created_at` (a conversation cannot be archived
+  before it was created — M27).
 - `participants` — zero rows whose `conversation_id` is absent from
   `conversations`, or whose `person_id` is absent from `people`.
 - `messages` — zero rows whose `author_person_id` is absent from `people`, or
