@@ -4,11 +4,20 @@ import { requireDb } from '$lib/server/platform';
 import { createConversationWithParticipants } from '$lib/server/db';
 import { nowIso } from '$lib/server/time';
 
-// GET /api/conversations — all conversation threads.
+// GET /api/conversations — all conversation threads. `last_message_at` is the
+// timestamp of the newest *readable* message in each thread (a soft-deleted
+// message is excluded), or null for an empty thread — the web app compares it
+// against a per-device last-viewed time to show unread indicators.
 export const GET: RequestHandler = async ({ platform }) => {
 	const db = requireDb(platform);
 	const { results } = await db
-		.prepare('SELECT id, name, slug, created_at FROM conversations ORDER BY created_at')
+		.prepare(
+			`SELECT c.id, c.name, c.slug, c.created_at,
+			        (SELECT max(m.created_at) FROM messages m
+			           WHERE m.conversation_id = c.id AND m.deleted_at IS NULL) AS last_message_at
+			 FROM conversations c
+			 ORDER BY c.created_at`
+		)
 		.all();
 	return json(results);
 };
