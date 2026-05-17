@@ -76,6 +76,10 @@
 	// Per-conversation last-viewed timestamps (slug -> ISO), mirrored from
 	// localStorage — drives the unread dot on each conversation tab (M23).
 	let readState = $state<Record<string, string>>({});
+	// Desktop notifications (M28): the current Notification permission, and the
+	// time the live stream connected — messages older than this are backlog.
+	let notifyPermission = $state('default');
+	let streamOpenedAt = '';
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
 	// Conversations split by archived state (M27).
@@ -162,6 +166,7 @@
 		messages = [...messages, message];
 		// A new message in the thread on screen is read as it arrives.
 		markRead(activeSlug);
+		maybeNotify(message);
 		tick().then(() => listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 }));
 	}
 
@@ -170,6 +175,9 @@
 	// it arrives — no client-side polling. EventSource reconnects on its own.
 	function openStream() {
 		stream?.close();
+		// Messages already in the conversation are replayed on connect; only
+		// messages created after this moment count as "new" for notifications.
+		streamOpenedAt = new Date().toISOString();
 		stream = new EventSource(`/api/conversations/${activeSlug}/stream`);
 		stream.onmessage = (event) => {
 			try {
@@ -405,6 +413,42 @@
 		}
 	}
 
+	// Desktop notifications (M28). The whole feature is inert where the
+	// Notification API is unavailable.
+	function canNotify(): boolean {
+		return typeof Notification !== 'undefined';
+	}
+
+	async function requestNotifyPermission() {
+		if (!canNotify()) return;
+		try {
+			notifyPermission = await Notification.requestPermission();
+		} catch {
+			// permission request unavailable — leave the button as-is
+		}
+	}
+
+	// Fire a desktop notification for a genuinely new message from someone
+	// else that arrived while the tab is in the background.
+	function maybeNotify(message: Message) {
+		if (!canNotify() || notifyPermission !== 'granted') return;
+		if (!document.hidden) return;
+		if (message.author_person_id === senderId) return;
+		if (message.created_at <= streamOpenedAt) return;
+		try {
+			const note = new Notification(`New message in #${activeSlug}`, {
+				body: `${message.author_name}: ${message.body}`.slice(0, 140),
+				tag: message.id
+			});
+			note.onclick = () => {
+				window.focus();
+				note.close();
+			};
+		} catch {
+			// notification construction failed — ignore
+		}
+	}
+
 	async function send() {
 		const body = draft.trim();
 		if (body === '' || senderId === '' || sending) return;
@@ -584,6 +628,7 @@
 		} catch {
 			// ignore
 		}
+		if (canNotify()) notifyPermission = Notification.permission;
 		draft = loadDraft(activeSlug);
 		loadPeople();
 		loadConversations();
@@ -604,9 +649,21 @@
 	<header>
 		<div class="titlebar">
 			<h1>Household Hub</h1>
-			<button type="button" class="theme-toggle" onclick={cycleTheme} title="Switch theme">
-				{theme === 'auto' ? 'Auto theme' : theme === 'light' ? '☀ Light' : '🌙 Dark'}
-			</button>
+			<div class="titlebar-actions">
+				{#if canNotify() && notifyPermission === 'default'}
+					<button
+						type="button"
+						class="theme-toggle"
+						onclick={requestNotifyPermission}
+						title="Enable desktop notifications"
+					>
+						🔔 Notify
+					</button>
+				{/if}
+				<button type="button" class="theme-toggle" onclick={cycleTheme} title="Switch theme">
+					{theme === 'auto' ? 'Auto theme' : theme === 'light' ? '☀ Light' : '🌙 Dark'}
+				</button>
+			</div>
 		</div>
 		<nav class="conversations" aria-label="Conversations">
 			{#each activeConversations as conversation (conversation.id)}
@@ -895,6 +952,12 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
+	}
+
+	.titlebar-actions {
+		display: flex;
+		gap: 0.4rem;
+		flex: none;
 	}
 
 	.theme-toggle {

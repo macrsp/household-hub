@@ -163,6 +163,9 @@ when each is reached.
   renames a conversation and archives it (a soft, reversible state); the tab
   bar keeps archived threads hidden behind a reveal toggle and gains a Manage
   panel for the active thread.
+- [ ] **M28 — Desktop notifications for new messages.** With the member's
+  permission, a browser notification fires when a message from someone else
+  arrives while the tab is in the background.
 
 ## Surprises & Discoveries
 
@@ -659,6 +662,19 @@ unarchive, 400 on empty body / blank name, 404 on an unknown slug) — recorded
 under Outcomes. No new try/catch wraps the write: the `PATCH` handler lets a
 failed write throw to a 500 (no silent fallback), and `updateConversation`
 issues one statement with no loop.
+
+**M28 — Desktop notifications for new messages.** Purely a `+page.svelte`
+change — no API, database, or write path is touched, so no Write-Path
+Checklist. A 🔔 titlebar button, shown only while the browser
+`Notification.permission` is `default`, calls `Notification.requestPermission()`
+from that user gesture. `openStream` records `streamOpenedAt`; when a streamed
+message is genuinely new (`created_at` after `streamOpenedAt`), is not from the
+active sender, arrives while `document.hidden`, and permission is `granted`,
+the page fires a `Notification` titled with the conversation and showing a
+short body; clicking it focuses the window. Backlog messages replayed on
+connect are older than `streamOpenedAt`, so reconnecting never re-notifies.
+The whole feature is guarded by `typeof Notification !== 'undefined'` so it is
+inert where the API is unavailable.
 
 ## Concrete Steps
 
