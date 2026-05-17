@@ -10,6 +10,59 @@
 		<meta name="theme-color" content="#2563eb" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-title" content="Household Hub" />
+		<style>
+			:root {
+				--bg: #f4f4f5;
+				--surface: #ffffff;
+				--raised: #fafafa;
+				--text: #18181b;
+				--muted: #52525b;
+				--dim: #71717a;
+				--faint: #a1a1aa;
+				--border: #e4e4e7;
+				--border-strong: #d4d4d8;
+				--accent: #2563eb;
+				--on-accent: #ffffff;
+				--danger: #dc2626;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root:not([data-theme='light']) {
+					--bg: #18181b;
+					--surface: #1f1f23;
+					--raised: #27272a;
+					--text: #f4f4f5;
+					--muted: #d4d4d8;
+					--dim: #a1a1aa;
+					--faint: #71717a;
+					--border: #3f3f46;
+					--border-strong: #52525b;
+					--accent: #3b82f6;
+					--danger: #f87171;
+				}
+			}
+			:root[data-theme='dark'] {
+				--bg: #18181b;
+				--surface: #1f1f23;
+				--raised: #27272a;
+				--text: #f4f4f5;
+				--muted: #d4d4d8;
+				--dim: #a1a1aa;
+				--faint: #71717a;
+				--border: #3f3f46;
+				--border-strong: #52525b;
+				--accent: #3b82f6;
+				--danger: #f87171;
+			}
+		</style>
+		<script>
+			// Apply the saved theme before first paint to avoid a flash.
+			try {
+				var t = localStorage.getItem('hh-theme');
+				if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+			} catch (e) {
+				/* ignore */
+			}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

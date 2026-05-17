@@ -120,21 +120,21 @@
 <style>
 	:global(body) {
 		margin: 0;
-		background: #f4f4f5;
+		background: var(--bg);
 		font-family:
 			system-ui,
 			-apple-system,
 			Segoe UI,
 			Roboto,
 			sans-serif;
-		color: #18181b;
+		color: var(--text);
 	}
 
 	main {
 		max-width: 680px;
 		margin: 0 auto;
 		padding: 1.5rem 1.25rem 3rem;
-		background: #ffffff;
+		background: var(--surface);
 		line-height: 1.55;
 	}
 
@@ -148,7 +148,7 @@
 	}
 
 	.effective {
-		color: #71717a;
+		color: var(--dim);
 		font-size: 0.85rem;
 		margin-top: 0;
 	}
@@ -159,8 +159,8 @@
 	}
 
 	.emphasis {
-		background: #fafafa;
-		border-left: 3px solid #2563eb;
+		background: var(--raised);
+		border-left: 3px solid var(--accent);
 		padding: 0.6rem 0.8rem;
 		font-weight: 500;
 	}
@@ -168,7 +168,7 @@
 	hr {
 		margin: 2rem 0;
 		border: none;
-		border-top: 1px solid #e4e4e7;
+		border-top: 1px solid var(--border);
 	}
 
 	dt {
@@ -181,6 +181,6 @@
 	}
 
 	a {
-		color: #2563eb;
+		color: var(--accent);
 	}
 </style>

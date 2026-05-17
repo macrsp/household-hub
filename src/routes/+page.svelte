@@ -51,6 +51,7 @@
 	let lastSearch = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
+	let theme = $state<'auto' | 'light' | 'dark'>('auto');
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
 	let listEl: HTMLElement | undefined = $state();
@@ -239,6 +240,23 @@
 		}
 	}
 
+	// Theme: 'auto' follows the OS; 'light' / 'dark' force it via a data-theme
+	// attribute on <html>. The choice persists in localStorage.
+	function applyTheme() {
+		try {
+			if (theme === 'auto') delete document.documentElement.dataset.theme;
+			else document.documentElement.dataset.theme = theme;
+			localStorage.setItem('hh-theme', theme);
+		} catch {
+			// localStorage unavailable — the in-memory choice still applies
+		}
+	}
+
+	function cycleTheme() {
+		theme = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto';
+		applyTheme();
+	}
+
 	async function send() {
 		const body = draft.trim();
 		if (body === '' || senderId === '' || sending) return;
@@ -312,6 +330,12 @@
 	}
 
 	onMount(() => {
+		try {
+			const saved = localStorage.getItem('hh-theme');
+			if (saved === 'light' || saved === 'dark' || saved === 'auto') theme = saved;
+		} catch {
+			// ignore
+		}
 		loadPeople();
 		loadConversations();
 		openStream();
@@ -325,7 +349,12 @@
 
 <main>
 	<header>
-		<h1>Household Hub</h1>
+		<div class="titlebar">
+			<h1>Household Hub</h1>
+			<button type="button" class="theme-toggle" onclick={cycleTheme} title="Switch theme">
+				{theme === 'auto' ? 'Auto theme' : theme === 'light' ? '☀ Light' : '🌙 Dark'}
+			</button>
+		</div>
 		<nav class="conversations" aria-label="Conversations">
 			{#each conversations as conversation (conversation.id)}
 				<button
@@ -496,14 +525,14 @@
 <style>
 	:global(body) {
 		margin: 0;
-		background: #f4f4f5;
+		background: var(--bg);
 		font-family:
 			system-ui,
 			-apple-system,
 			Segoe UI,
 			Roboto,
 			sans-serif;
-		color: #18181b;
+		color: var(--text);
 	}
 
 	main {
@@ -512,17 +541,36 @@
 		min-height: 100dvh;
 		display: flex;
 		flex-direction: column;
-		background: #ffffff;
+		background: var(--surface);
 	}
 
 	header {
 		padding: 1rem 1.25rem 0.5rem;
-		border-bottom: 1px solid #e4e4e7;
+		border-bottom: 1px solid var(--border);
 	}
 
 	h1 {
 		margin: 0;
 		font-size: 1.25rem;
+	}
+
+	.titlebar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.theme-toggle {
+		font: inherit;
+		font-size: 0.72rem;
+		padding: 0.2rem 0.6rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 999px;
+		background: var(--surface);
+		color: var(--muted);
+		cursor: pointer;
+		flex: none;
 	}
 
 	.conversations {
@@ -536,17 +584,17 @@
 		font: inherit;
 		font-size: 0.8rem;
 		padding: 0.25rem 0.6rem;
-		border: 1px solid #d4d4d8;
+		border: 1px solid var(--border-strong);
 		border-radius: 999px;
-		background: #ffffff;
-		color: #52525b;
+		background: var(--surface);
+		color: var(--muted);
 		cursor: pointer;
 	}
 
 	.conv-tab.active {
-		background: #2563eb;
-		border-color: #2563eb;
-		color: #ffffff;
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--on-accent);
 	}
 
 	.conv-new {
@@ -584,15 +632,15 @@
 
 	.search button {
 		font-size: 0.8rem;
-		background: #ffffff;
-		color: #52525b;
+		background: var(--surface);
+		color: var(--muted);
 		cursor: pointer;
 	}
 
 	.search-banner {
 		align-self: center;
 		font-size: 0.78rem;
-		color: #71717a;
+		color: var(--dim);
 		margin: 0 0 0.5rem;
 	}
 
@@ -606,14 +654,14 @@
 	}
 
 	.empty {
-		color: #a1a1aa;
+		color: var(--faint);
 		text-align: center;
 		margin-top: 2rem;
 	}
 
 	.message {
-		background: #fafafa;
-		border: 1px solid #e4e4e7;
+		background: var(--raised);
+		border: 1px solid var(--border);
 		border-radius: 0.5rem;
 		padding: 0.5rem 0.75rem;
 	}
@@ -636,7 +684,7 @@
 		width: 1.15rem;
 		height: 1.15rem;
 		border-radius: 50%;
-		color: #ffffff;
+		color: var(--on-accent);
 		font-size: 0.62rem;
 		font-weight: 700;
 		flex: none;
@@ -646,14 +694,14 @@
 		text-transform: uppercase;
 		letter-spacing: 0.03em;
 		font-size: 0.6rem;
-		background: #e4e4e7;
-		color: #52525b;
+		background: var(--border);
+		color: var(--muted);
 		padding: 0.05rem 0.35rem;
 		border-radius: 0.25rem;
 	}
 
 	.time {
-		color: #a1a1aa;
+		color: var(--faint);
 		margin-left: auto;
 	}
 
@@ -666,13 +714,13 @@
 	.receipt {
 		margin: 0.3rem 0 0;
 		font-size: 0.68rem;
-		color: #a1a1aa;
+		color: var(--faint);
 	}
 
 	.day-divider {
 		align-self: center;
 		font-size: 0.68rem;
-		color: #a1a1aa;
+		color: var(--faint);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		margin: 0.35rem 0;
@@ -684,15 +732,15 @@
 		font-size: 0.78rem;
 		padding: 0.3rem 0.8rem;
 		margin-bottom: 0.25rem;
-		border: 1px solid #d4d4d8;
+		border: 1px solid var(--border-strong);
 		border-radius: 999px;
-		background: #ffffff;
-		color: #52525b;
+		background: var(--surface);
+		color: var(--muted);
 		cursor: pointer;
 	}
 
 	.load-older:disabled {
-		color: #a1a1aa;
+		color: var(--faint);
 		cursor: default;
 	}
 
@@ -702,10 +750,10 @@
 		gap: 0.6rem;
 		flex-wrap: wrap;
 		padding: 0.5rem 1.25rem;
-		border-top: 1px solid #e4e4e7;
+		border-top: 1px solid var(--border);
 		font-size: 0.8rem;
-		color: #52525b;
-		background: #fafafa;
+		color: var(--muted);
+		background: var(--raised);
 	}
 
 	.prefs-label {
@@ -716,14 +764,14 @@
 		display: flex;
 		gap: 0.5rem;
 		padding: 0.75rem 1.25rem;
-		border-top: 1px solid #e4e4e7;
+		border-top: 1px solid var(--border);
 	}
 
 	select,
 	input,
 	button {
 		font: inherit;
-		border: 1px solid #d4d4d8;
+		border: 1px solid var(--border-strong);
 		border-radius: 0.4rem;
 		padding: 0.5rem;
 	}
@@ -739,23 +787,23 @@
 	}
 
 	.composer button {
-		background: #2563eb;
-		color: #ffffff;
-		border-color: #2563eb;
+		background: var(--accent);
+		color: var(--on-accent);
+		border-color: var(--accent);
 		cursor: pointer;
 		padding-inline: 1rem;
 	}
 
 	.composer button:disabled {
-		background: #a1a1aa;
-		border-color: #a1a1aa;
+		background: var(--faint);
+		border-color: var(--faint);
 		cursor: not-allowed;
 	}
 
 	.error {
 		margin: 0;
 		padding: 0 1.25rem 0.75rem;
-		color: #dc2626;
+		color: var(--danger);
 		font-size: 0.85rem;
 	}
 
@@ -774,6 +822,6 @@
 	}
 
 	.legal a {
-		color: #a1a1aa;
+		color: var(--faint);
 	}
 </style>

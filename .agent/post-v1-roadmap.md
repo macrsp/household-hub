@@ -138,6 +138,9 @@ when each is reached.
   the built app shell — so household-hub can be installed to a home screen.
 - [ ] **M20 — Date separators.** The message list shows a "Today" /
   "Yesterday" / date divider between messages from different calendar days.
+- [ ] **M21 — Dark mode.** Theme colours move to CSS custom properties; the app
+  follows `prefers-color-scheme` and offers an Auto/Light/Dark toggle that
+  persists in `localStorage`.
 
 ## Surprises & Discoveries
 
@@ -488,6 +491,19 @@ messages by calendar day and `dayLabel` renders divider text (Today /
 Yesterday / weekday + date); the message-list `{#each}` emits a `.day-divider`
 before the first message of each new day. Applies to both the live view and
 search results. No API, database, or write path is touched.
+
+**M21 — Dark mode.** A presentation-only change — no API, database, or write
+path is touched. The colour palette is lifted out of component CSS into
+`:root` custom properties defined in `app.html`: a light palette under
+`:root`, and a dark palette applied two ways — `@media (prefers-color-scheme:
+dark) :root:not([data-theme='light'])` for the Auto default, and an explicit
+`:root[data-theme='dark']` for the manual override. A tiny inline `<script>`
+in `<head>` reads `localStorage['hh-theme']` and sets `documentElement.dataset
+.theme` before first paint, so a saved Light/Dark choice causes no flash.
+`+page.svelte` and `privacy/+page.svelte` swap every hardcoded hex for a
+`var(--…)` reference; `+page.svelte` adds a titlebar theme toggle that cycles
+Auto → Light → Dark, calls `applyTheme()`, and writes the choice back to
+`localStorage`.
 
 ## Concrete Steps
 
