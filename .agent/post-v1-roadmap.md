@@ -108,6 +108,11 @@ when each is reached.
   (north0401@gmail.com → Matt, macrsp@gmail.com → Person Two). Verified by
   curl: no/wrong secret → 403, correct secret → 200; the email-worker builds
   (`wrangler deploy --dry-run`). 38 unit tests pass.
+- [ ] **M12 — SMS go-live.** (completed: carrier-registration compliance
+  pages — a privacy policy and SMS messaging terms hosted at `/privacy`,
+  linked from the app; remaining: set the Twilio secrets, migration 0003 to
+  replace the placeholder phone numbers with real ones, and first-message
+  opt-out language — all pending a verified number and credentials.)
 
 ## Surprises & Discoveries
 
@@ -352,6 +357,24 @@ real addresses replace placeholders). The email webhook's `messages` write
 path is unchanged from M9 (`insertMessage`). M11 adds one server gate — the
 `EMAIL_WEBHOOK_SECRET` header check — which only rejects requests; it does not
 touch a write. No new try/catch around a user-asset write is introduced.
+
+**M12 — SMS go-live.** SMS is a required transport, so the relay must clear
+carrier registration (A2P 10DLC or toll-free verification). M12's first,
+credential-independent part is the compliance content: `src/routes/privacy/+page.svelte`
+serves a complete privacy policy and SMS messaging terms at `/privacy`,
+linked from the app, so registration has a real public URL. The privacy
+policy carries the clause carrier reviewers require — that mobile and
+SMS-opt-in data is never sold or shared with third parties. The remaining
+parts wait on a verified number and credentials: setting `TWILIO_ACCOUNT_SID`,
+`TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` as Pages secrets (then a
+redeploy — secrets bind at deploy time); migration 0003 replacing the
+placeholder `+1555…` endpoint numbers with the household's real mobile
+numbers; and a first-message opt-out line so live SMS matches the
+registration attestation.
+
+This first part touches no user-asset write path — `/privacy` is a static
+page — so it carries no User-Asset Write-Path Checklist; migration 0003 (a
+seed-only `endpoints` change, as in 0002) will carry one when it lands.
 
 ## Concrete Steps
 
