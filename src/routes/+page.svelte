@@ -45,6 +45,10 @@
 	let errorText = $state('');
 	let loadingOlder = $state(false);
 	let noMoreOlder = $state(false);
+	let searchInput = $state('');
+	let searchMode = $state(false);
+	let searchResults = $state<Message[]>([]);
+	let lastSearch = $state('');
 	let listEl: HTMLElement | undefined = $state();
 	// Live message stream for the active conversation (Server-Sent Events).
 	let stream: EventSource | undefined;
@@ -133,6 +137,7 @@
 		messages = [];
 		errorText = '';
 		noMoreOlder = false;
+		clearSearch();
 		openStream();
 		loadPrefs();
 	}
@@ -165,6 +170,33 @@
 		} finally {
 			loadingOlder = false;
 		}
+	}
+
+	// Search the active conversation's message bodies for the typed term.
+	async function runSearch() {
+		const q = searchInput.trim();
+		if (q === '') {
+			clearSearch();
+			return;
+		}
+		try {
+			const res = await fetch(
+				`/api/conversations/${activeSlug}/messages?q=${encodeURIComponent(q)}`
+			);
+			if (!res.ok) return;
+			searchResults = await res.json();
+			lastSearch = q;
+			searchMode = true;
+		} catch {
+			// transient
+		}
+	}
+
+	function clearSearch() {
+		searchMode = false;
+		searchResults = [];
+		searchInput = '';
+		lastSearch = '';
 	}
 
 	async function send() {
@@ -251,18 +283,38 @@
 				</button>
 			{/each}
 		</nav>
+		<form
+			class="search"
+			onsubmit={(e) => {
+				e.preventDefault();
+				runSearch();
+			}}
+		>
+			<input type="search" placeholder="Search #{activeSlug}…" bind:value={searchInput} />
+			{#if searchMode}
+				<button type="button" onclick={clearSearch}>Clear</button>
+			{/if}
+		</form>
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite">
-		{#if messages.length > 0 && !noMoreOlder}
+		{#if searchMode}
+			<p class="search-banner">
+				{searchResults.length} result{searchResults.length === 1 ? '' : 's'} for “{lastSearch}”
+			</p>
+		{:else if messages.length > 0 && !noMoreOlder}
 			<button type="button" class="load-older" onclick={loadOlder} disabled={loadingOlder}>
 				{loadingOlder ? 'Loading…' : 'Load older messages'}
 			</button>
 		{/if}
-		{#if messages.length === 0}
-			<p class="empty">No messages in #{activeSlug} yet. Say hello below.</p>
+		{#if (searchMode ? searchResults : messages).length === 0}
+			<p class="empty">
+				{searchMode
+					? 'No messages match your search.'
+					: `No messages in #${activeSlug} yet. Say hello below.`}
+			</p>
 		{:else}
-			{#each messages as message (message.id)}
+			{#each searchMode ? searchResults : messages as message (message.id)}
 				<article class="message">
 					<div class="meta">
 						<span
@@ -404,6 +456,32 @@
 		background: #2563eb;
 		border-color: #2563eb;
 		color: #ffffff;
+	}
+
+	.search {
+		display: flex;
+		gap: 0.4rem;
+		margin-top: 0.5rem;
+	}
+
+	.search input {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.85rem;
+	}
+
+	.search button {
+		font-size: 0.8rem;
+		background: #ffffff;
+		color: #52525b;
+		cursor: pointer;
+	}
+
+	.search-banner {
+		align-self: center;
+		font-size: 0.78rem;
+		color: #71717a;
+		margin: 0 0 0.5rem;
 	}
 
 	.messages {
