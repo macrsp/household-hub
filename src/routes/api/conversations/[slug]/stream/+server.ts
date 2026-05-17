@@ -37,10 +37,16 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 				try {
 					const { results } = await db
 						.prepare(
-							`SELECT id, body, source_transport, created_at, author_person_id, author_name
+							`SELECT id, body, source_transport, created_at, author_person_id, author_name,
+							        delivery_total, delivery_ok, delivery_failed
 							 FROM (
 							   SELECT m.id, m.body, m.source_transport, m.created_at,
-							          m.author_person_id, p.display_name AS author_name
+							          m.author_person_id, p.display_name AS author_name,
+							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
+							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
+							             AND d.status IN ('sent', 'sent_stubbed', 'delivered')) AS delivery_ok,
+							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
+							             AND d.status = 'failed') AS delivery_failed
 							   FROM messages m
 							   JOIN people p ON p.id = m.author_person_id
 							   WHERE m.conversation_id = ?

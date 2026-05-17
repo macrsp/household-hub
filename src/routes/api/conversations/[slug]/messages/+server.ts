@@ -23,10 +23,16 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 	// Take the most-recent 200, then present them ascending for display.
 	const { results } = await db
 		.prepare(
-			`SELECT id, body, source_transport, created_at, author_person_id, author_name
+			`SELECT id, body, source_transport, created_at, author_person_id, author_name,
+			        delivery_total, delivery_ok, delivery_failed
 			 FROM (
 			   SELECT m.id, m.body, m.source_transport, m.created_at,
-			          m.author_person_id, p.display_name AS author_name
+			          m.author_person_id, p.display_name AS author_name,
+			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
+			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
+			             AND d.status IN ('sent', 'sent_stubbed', 'delivered')) AS delivery_ok,
+			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
+			             AND d.status = 'failed') AS delivery_failed
 			   FROM messages m
 			   JOIN people p ON p.id = m.author_person_id
 			   WHERE m.conversation_id = ?
@@ -82,5 +88,17 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		console.error('[fanout] failed for message', message.id, e);
 	}
 
-	return json(message, { status: 201 });
+	// Return the message with its delivery counts — fanout has completed, so
+	// the web app can show a receipt immediately on the sender's own message.
+	const counts = await db
+		.prepare(
+			`SELECT count(*) AS delivery_total,
+			        count(CASE WHEN status IN ('sent','sent_stubbed','delivered') THEN 1 END) AS delivery_ok,
+			        count(CASE WHEN status = 'failed' THEN 1 END) AS delivery_failed
+			 FROM deliveries WHERE message_id = ?`
+		)
+		.bind(message.id)
+		.first<{ delivery_total: number; delivery_ok: number; delivery_failed: number }>();
+
+	return json({ ...message, ...counts }, { status: 201 });
 };

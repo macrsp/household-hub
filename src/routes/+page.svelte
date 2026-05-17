@@ -18,6 +18,9 @@
 		created_at: string;
 		author_person_id: string;
 		author_name: string;
+		delivery_total?: number;
+		delivery_ok?: number;
+		delivery_failed?: number;
 	}
 	interface Prefs {
 		muted: boolean;
@@ -220,6 +223,17 @@
 						<span class="time">{formatTime(message.created_at)}</span>
 					</div>
 					<p class="body">{message.body}</p>
+					{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
+						<p class="receipt">
+							{#if (message.delivery_failed ?? 0) > 0}
+								⚠ sent to {message.delivery_ok}, failed for {message.delivery_failed}
+							{:else if (message.delivery_ok ?? 0) < (message.delivery_total ?? 0)}
+								sending… ({message.delivery_ok}/{message.delivery_total})
+							{:else}
+								✓ sent to {message.delivery_total}
+							{/if}
+						</p>
+					{/if}
 				</article>
 			{/each}
 		{/if}
@@ -390,6 +404,12 @@
 		margin: 0.25rem 0 0;
 		white-space: pre-wrap;
 		word-break: break-word;
+	}
+
+	.receipt {
+		margin: 0.3rem 0 0;
+		font-size: 0.68rem;
+		color: #a1a1aa;
 	}
 
 	.prefs {

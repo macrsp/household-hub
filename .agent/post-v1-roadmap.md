@@ -113,6 +113,9 @@ when each is reached.
   linked from the app; remaining: set the Twilio secrets, migration 0003 to
   replace the placeholder phone numbers with real ones, and first-message
   opt-out language — all pending a verified number and credentials.)
+- [ ] **M13 — Message delivery receipts.** The conversation view shows, under
+  each message the current sender authored, how many recipients it reached —
+  surfacing the `deliveries` data the relay already records.
 
 ## Surprises & Discoveries
 
@@ -375,6 +378,17 @@ registration attestation.
 This first part touches no user-asset write path — `/privacy` is a static
 page — so it carries no User-Asset Write-Path Checklist; migration 0003 (a
 seed-only `endpoints` change, as in 0002) will carry one when it lands.
+
+**M13 — Message delivery receipts.** The relay records a `deliveries` row per
+recipient endpoint per message, but the web app never showed it. M13 surfaces
+it: the messages API — both `GET /api/conversations/[slug]/messages` and the
+SSE stream — include per-message delivery counts (`delivery_total`,
+`delivery_ok` for `sent` / `sent_stubbed` / `delivered`, and `delivery_failed`)
+via correlated subqueries over `deliveries`; the `POST` returns the same counts
+after fanout so the sender's own message shows a receipt immediately.
+`+page.svelte` renders a small receipt under each message the current sender
+authored — `✓ sent to N`, `sending… (k/N)`, or a failed count. Read-only — no
+user-asset write path — so no Write-Path Checklist.
 
 ## Concrete Steps
 
