@@ -30,6 +30,9 @@ export interface Message {
 	// retracts the message. The row is never DELETEd. Omitted on insert — a new
 	// message is always live, which the schema default (NULL) already gives.
 	deleted_at?: string | null;
+	// Editing (M24): NULL until the author first edits the message, then an
+	// ISO 8601 string. Omitted on insert — a new message is unedited (NULL).
+	edited_at?: string | null;
 }
 
 export interface DeliveryRow {
@@ -74,6 +77,30 @@ export async function softDeleteMessage(
 			 WHERE id = ? AND author_person_id = ? AND deleted_at IS NULL`
 		)
 		.bind(nowIso(), messageId, authorPersonId)
+		.run();
+	return (res.meta.changes ?? 0) > 0;
+}
+
+/**
+ * Edit a message's body in place and stamp `edited_at`. The author id is part
+ * of the WHERE clause, so only the message's own author can edit it, and
+ * `deleted_at IS NULL` makes editing a retracted message impossible. Returns
+ * true if exactly this UPDATE changed a row — the caller has already confirmed
+ * the message exists, the caller is its author, and it is not deleted, so a
+ * false return is not expected in practice.
+ */
+export async function editMessage(
+	db: D1Database,
+	messageId: string,
+	authorPersonId: string,
+	body: string
+): Promise<boolean> {
+	const res = await db
+		.prepare(
+			`UPDATE messages SET body = ?, edited_at = ?
+			 WHERE id = ? AND author_person_id = ? AND deleted_at IS NULL`
+		)
+		.bind(body, nowIso(), messageId, authorPersonId)
 		.run();
 	return (res.meta.changes ?? 0) > 0;
 }

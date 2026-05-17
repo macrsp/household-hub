@@ -49,6 +49,12 @@ const PROBES = [
 			'WHERE deleted_at IS NOT NULL AND deleted_at < created_at'
 	},
 	{
+		name: 'messages — edited_at earlier than created_at',
+		sql:
+			'SELECT count(*) AS n FROM messages ' +
+			'WHERE edited_at IS NOT NULL AND edited_at < created_at'
+	},
+	{
 		name: 'deliveries — dangling message_id / endpoint_id',
 		sql:
 			'SELECT count(*) AS n FROM deliveries ' +

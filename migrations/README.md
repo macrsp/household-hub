@@ -57,8 +57,10 @@ run at least one "this should always be zero" query per class:
 - `participants` — zero rows whose `conversation_id` is absent from
   `conversations`, or whose `person_id` is absent from `people`.
 - `messages` — zero rows whose `author_person_id` is absent from `people`, or
-  whose `conversation_id` is absent from `conversations`; and zero rows whose
+  whose `conversation_id` is absent from `conversations`; zero rows whose
   `deleted_at` is earlier than `created_at` (a message cannot be retracted
-  before it was sent — M22 soft-deletion).
+  before it was sent — M22 soft-deletion); and zero rows whose `edited_at` is
+  earlier than `created_at` (a message cannot be edited before it was sent —
+  M24 editing).
 - `deliveries` — zero rows whose `message_id` is absent from `messages`, or
   whose `endpoint_id` is absent from `endpoints`.

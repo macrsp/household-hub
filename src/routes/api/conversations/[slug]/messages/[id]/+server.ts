@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
-import { softDeleteMessage } from '$lib/server/db';
+import { softDeleteMessage, editMessage } from '$lib/server/db';
 
 // DELETE /api/conversations/[slug]/messages/[id] — soft-delete a message.
 // Body: { personId: string }. Only the message's own author may delete it.
@@ -38,4 +38,46 @@ export const DELETE: RequestHandler = async ({ platform, params, request }) => {
 	// returns false. Either way the desired end state (deleted) now holds.
 	const changed = await softDeleteMessage(db, params.id, personId);
 	return json({ id: params.id, deleted: true, alreadyDeleted: !changed });
+};
+
+// PATCH /api/conversations/[slug]/messages/[id] — edit a message's body.
+// Body: { personId: string, body: non-empty string }. Only the author may
+// edit, and a soft-deleted message cannot be edited (409). The edit replaces
+// the canonical body and stamps edited_at; copies already fanned out over
+// SMS/email are unaffected — the same app-only scope as M22 soft-deletion.
+export const PATCH: RequestHandler = async ({ platform, params, request }) => {
+	const db = requireDb(platform);
+
+	const raw = (await request.json().catch(() => null)) as
+		| { personId?: unknown; body?: unknown }
+		| null;
+	const personId = raw?.personId;
+	const body = typeof raw?.body === 'string' ? raw.body.trim() : '';
+	if (typeof personId !== 'string' || personId === '' || body === '') {
+		throw error(400, 'Expected JSON body { personId: string, body: non-empty string }');
+	}
+
+	// The message must exist within this conversation (joined via the slug).
+	const message = await db
+		.prepare(
+			`SELECT m.author_person_id, m.deleted_at
+			 FROM messages m
+			 JOIN conversations c ON c.id = m.conversation_id
+			 WHERE m.id = ? AND c.slug = ?`
+		)
+		.bind(params.id, params.slug)
+		.first<{ author_person_id: string; deleted_at: string | null }>();
+	if (!message) throw error(404, `Unknown message: ${params.id}`);
+
+	// Only the author may edit their own message — this gates the write.
+	if (message.author_person_id !== personId) {
+		throw error(403, 'Only the message author can edit it.');
+	}
+	// A retracted message cannot be edited back into existence.
+	if (message.deleted_at !== null) {
+		throw error(409, 'A deleted message cannot be edited.');
+	}
+
+	await editMessage(db, params.id, personId, body);
+	return json({ id: params.id, body, edited: true });
 };
