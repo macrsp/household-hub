@@ -74,6 +74,9 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
 			.bind('person-three', 'Person Three', t),
 		db
+			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
+			.bind('person-claude', 'Claude Code', t),
+		db
 			.prepare(
 				'INSERT INTO endpoints (id, person_id, type, address, verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
 			)
@@ -94,6 +97,9 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		db
 			.prepare('INSERT INTO conversations (id, name, slug, created_at) VALUES (?, ?, ?, ?)')
 			.bind('conv-groceries', 'Groceries', 'groceries', t),
+		db
+			.prepare('INSERT INTO conversations (id, name, slug, created_at) VALUES (?, ?, ?, ?)')
+			.bind('conv-claude', 'Claude Code', 'claude', t),
 		db
 			.prepare(
 				"INSERT INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES (?, ?, 'all', 0)"
@@ -123,7 +129,27 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 			.prepare(
 				"INSERT INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES (?, ?, 'all', 0)"
 			)
-			.bind('conv-groceries', 'person-three')
+			.bind('conv-groceries', 'person-three'),
+		db
+			.prepare(
+				"INSERT INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES (?, ?, 'all', 0)"
+			)
+			.bind('conv-claude', 'person-matt'),
+		db
+			.prepare(
+				"INSERT INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES (?, ?, 'all', 0)"
+			)
+			.bind('conv-claude', 'person-two'),
+		db
+			.prepare(
+				"INSERT INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES (?, ?, 'all', 0)"
+			)
+			.bind('conv-claude', 'person-three'),
+		db
+			.prepare(
+				"INSERT INTO participants (conversation_id, person_id, delivery_preference, muted) VALUES (?, ?, 'all', 0)"
+			)
+			.bind('conv-claude', 'person-claude')
 	]);
 
 	return json({ ok: true });

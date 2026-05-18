@@ -17,18 +17,20 @@ async function conversationIdBySlug(db: D1Database, slug: string): Promise<strin
 }
 
 // GET /api/conversations/[slug]/messages — recent messages, oldest-first,
-// each carrying the author's display name and delivery counts. With
-// `?before=<ISO timestamp>`, returns the page of messages immediately older
-// than that timestamp instead — used for "load older" pagination. With
-// `?q=<term>`, returns messages whose body matches the term.
+// each carrying the author's display name and delivery counts. Filters:
+//   ?q=<term>             — messages whose body matches the term
+//   ?before=<ISO>         — the page of messages older than the cursor
+//   ?since=<ISO>          — only messages newer than the cursor (M52; the
+//                           dev-channel runner polls with this)
 export const GET: RequestHandler = async ({ platform, params, url }) => {
 	const db = requireDb(platform);
 	const conversationId = await conversationIdBySlug(db, params.slug);
 
-	// Filtering: ?q= searches message bodies; ?before= paginates to older
-	// messages. If both are present, search takes precedence.
+	// Filtering: ?q= searches; ?before= paginates older; ?since= fetches newer.
+	// The modes are mutually exclusive, checked in that order.
 	const q = url.searchParams.get('q')?.trim();
 	const before = url.searchParams.get('before');
+	const since = url.searchParams.get('since');
 	let filterClause = '';
 	const binds: string[] = [conversationId];
 	if (q) {
@@ -38,6 +40,9 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 	} else if (before) {
 		filterClause = 'AND m.created_at < ?';
 		binds.push(before);
+	} else if (since) {
+		filterClause = 'AND m.created_at > ?';
+		binds.push(since);
 	}
 
 	// Take the most-recent 200 (older than the cursor, if given), then present
