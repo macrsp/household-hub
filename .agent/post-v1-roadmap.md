@@ -180,6 +180,11 @@ when each is reached.
 - [ ] **M32 — Unit-test the message-format helpers.** The pure presentation
   helpers (`linkify`, `personHue`, `initial`, `dayKey`, `dayLabel`) move out of
   `+page.svelte` into `$lib/message-format.ts` and gain a unit-test suite.
+- [ ] **M33 — Standalone SMS Terms of Service page.** A dedicated `/sms-terms`
+  page describes the SMS program (types, frequency, cost, HELP/STOP, opt-in);
+  `/privacy` becomes privacy-only and cross-links it. Clears the A2P 10DLC
+  "Terms and Conditions" campaign rejection, whose root cause was the Terms of
+  Service field pointing at the privacy URL.
 
 ## Surprises & Discoveries
 
@@ -758,6 +763,21 @@ stable per-person hues, avatar initials, and calendar-day grouping. The
 day-grouping fixtures are built with the local-time `Date` constructor so the
 assertions hold regardless of the test runner's timezone (an early version
 keyed on `Z`-literal timestamps that straddled local midnight).
+
+**M33 — Standalone SMS Terms of Service page.** Presentation only — no API,
+database, or write path is touched, so no Write-Path Checklist. The A2P 10DLC
+campaign was rejected for a "Terms and Conditions" issue: the campaign's Terms
+of Service field pointed at `/privacy`, the same URL as the Privacy Policy
+field, and reviewers require a *distinct* Terms of Service page. M33 adds a
+dedicated `/sms-terms` route describing the SMS program — program name,
+message types and frequency, cost ("Message and data rates may apply"), how to
+opt in (forward-referencing the `/sms-opt-in` form built in M34), HELP and
+STOP, carrier-liability, and a support contact. `/privacy` is retitled
+"Privacy Policy", drops its trailing "SMS Messaging Terms" definition list
+(now redundant), updates its consent description to reference the opt-in form
+instead of the verbal/in-person narrative that contributed to the second
+rejection, and cross-links `/sms-terms`. The home-page footer links both
+pages, and `e2e/ui-smoke.spec.ts` gains a check that `/sms-terms` loads.
 
 ## Concrete Steps
 

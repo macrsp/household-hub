@@ -1,12 +1,17 @@
 <svelte:head>
-	<title>Privacy Policy &amp; SMS Terms — household-hub</title>
+	<title>Privacy Policy — household-hub</title>
 </svelte:head>
 
 <main>
 	<p class="back"><a href="/">&larr; back to household-hub</a></p>
 
-	<h1>household-hub — Privacy Policy &amp; SMS Messaging Terms</h1>
-	<p class="effective">Effective date: May 16, 2026</p>
+	<h1>household-hub — Privacy Policy</h1>
+	<p class="effective">Effective date: May 17, 2026</p>
+	<p>
+		This Privacy Policy describes how household-hub handles personal information. The
+		separate <a href="/sms-terms">SMS Terms of Service</a> describes the text-messaging
+		program itself.
+	</p>
 
 	<h2>About household-hub</h2>
 	<p>
@@ -40,12 +45,13 @@
 
 	<h2>SMS / text messaging</h2>
 	<p>
-		A household member consents to receive SMS messages from household-hub when the
-		household administrator adds their mobile number; members are added only after
-		agreeing, in person, to take part. SMS messages relay messages that other members
-		of the same household have sent. Message frequency varies with household activity.
-		Message and data rates may apply. Reply <strong>STOP</strong> to any message to stop
-		receiving SMS messages; reply <strong>HELP</strong> for help.
+		A household member consents to receive SMS messages by completing the opt-in form
+		at <a href="/sms-opt-in">household-hub.pages.dev/sms-opt-in</a>, where they provide
+		their mobile number and explicitly agree to take part. SMS messages relay messages
+		that other members of the same household have sent. Message frequency varies with
+		household activity. Message and data rates may apply. Reply <strong>STOP</strong> to
+		any message to stop receiving SMS messages; reply <strong>HELP</strong> for help.
+		Full details are in the <a href="/sms-terms">SMS Terms of Service</a>.
 	</p>
 	<p class="emphasis">
 		No mobile information — including mobile phone numbers and SMS opt-in or consent —
@@ -92,29 +98,11 @@
 
 	<hr />
 
-	<h2>SMS Messaging Terms</h2>
-	<dl>
-		<dt>Program</dt>
-		<dd>household-hub relays messages among the members of one private household.</dd>
-
-		<dt>Message frequency</dt>
-		<dd>Recurring and conversational; frequency varies with household activity.</dd>
-
-		<dt>Cost</dt>
-		<dd>Message and data rates may apply.</dd>
-
-		<dt>Opt-out</dt>
-		<dd>Reply STOP to cancel at any time. Reply HELP for help.</dd>
-
-		<dt>Carriers</dt>
-		<dd>Carriers are not liable for delayed or undelivered messages.</dd>
-
-		<dt>Eligibility</dt>
-		<dd>
-			SMS is available only to members of the household added by the household
-			administrator. There is no public sign-up.
-		</dd>
-	</dl>
+	<p>
+		The text-messaging program — message types, frequency, cost, HELP and STOP
+		instructions, and how to opt in — is described in the separate
+		<a href="/sms-terms">SMS Terms of Service</a>.
+	</p>
 </main>
 
 <style>
@@ -169,15 +157,6 @@
 		margin: 2rem 0;
 		border: none;
 		border-top: 1px solid var(--border);
-	}
-
-	dt {
-		font-weight: 600;
-		margin-top: 0.6rem;
-	}
-
-	dd {
-		margin: 0.15rem 0 0;
 	}
 
 	a {
