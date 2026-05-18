@@ -288,6 +288,9 @@ when each is reached.
   question about a conversation from its recent messages via Workers AI,
   without posting anything into the thread. Read-only and gated like the AI
   summary (M54).
+- [x] **M63 — Posted daily digest.** `POST /api/digest/post` generates the M61
+  digest and posts it into a conversation as Claude Code, turning the on-demand
+  digest into a proactive one a cron on the runner host can fire daily.
 
 ## Surprises & Discoveries
 
@@ -1406,6 +1409,27 @@ Workers AI binding or a failed call is `503 { available: false }`. The UI adds
 an "❓ Ask" button that toggles a question form in the header; the answer
 renders in a dismissable bar at the top of the message list. Read-only — no
 Write-Path Checklist entry.
+
+**M63 — Posted daily digest.** The M61 digest is on-demand; this makes it
+proactive. The digest generation moves into a shared `generateDigest(ai, db)`
+in `src/lib/server/digest.ts` that both `GET /api/digest` (M61) and the new
+`POST /api/digest/post` call. The post route generates the digest and, when it
+is non-empty, posts it into a conversation (default `general`, `?slug=` to
+override) as a message authored by `person-claude` — the same member the M55
+assistant uses. A cron on the operator's runner host fires it daily; when
+`DIGEST_POST_SECRET` is set it requires a matching `X-Webhook-Secret`, the same
+optional-secret pattern as the inbound-email webhook. Gating: an unknown slug
+is a 404, no Workers AI binding or a failed model call is a 503 that posts
+nothing, and a quiet window posts nothing and returns `200 { posted: false }`.
+
+Write-Path note (M63): the digest message is written through the existing
+typed `insertMessage` helper and fanned out with `fanoutMessage`, authored as
+`person-claude` — the identical path the M55 assistant reply uses. The fanout
+call is wrapped in try/catch, which is not a silent fallback of a user-asset
+write: the digest message itself is durably stored by `insertMessage` before
+fanout runs, and a fanout failure is logged with per-delivery rows recorded, so
+the canonical message is never lost. No new string set; the existing `messages`
+probes cover the row it inserts.
 
 ## Concrete Steps
 
