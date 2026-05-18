@@ -45,12 +45,13 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 	const { results } = await db
 		.prepare(
 			`SELECT id, body, source_transport, created_at, deleted_at, edited_at, pinned_at,
-			        author_person_id, author_name,
+			        reply_to_message_id, author_person_id, author_name,
 			        delivery_total, delivery_ok, delivery_failed
 			 FROM (
 			   SELECT m.id,
 			          CASE WHEN m.deleted_at IS NOT NULL THEN '' ELSE m.body END AS body,
 			          m.source_transport, m.created_at, m.deleted_at, m.edited_at, m.pinned_at,
+			          m.reply_to_message_id,
 			          m.author_person_id, p.display_name AS author_name,
 			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
 			          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
@@ -80,12 +81,13 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 };
 
 // POST /api/conversations/[slug]/messages — store a message that originated
-// in the web app. Body: { authorPersonId: string, body: non-empty string }.
+// in the web app. Body: { authorPersonId: string, body: non-empty string,
+// replyToMessageId?: string }.
 export const POST: RequestHandler = async ({ platform, params, request }) => {
 	const db = requireDb(platform);
 
 	const raw = (await request.json().catch(() => null)) as
-		| { authorPersonId?: unknown; body?: unknown }
+		| { authorPersonId?: unknown; body?: unknown; replyToMessageId?: unknown }
 		| null;
 	const authorPersonId = raw?.authorPersonId;
 	const body = typeof raw?.body === 'string' ? raw.body.trim() : '';
@@ -102,13 +104,28 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		.first<{ id: string }>();
 	if (!author) throw error(400, `Unknown authorPersonId: ${authorPersonId}`);
 
+	// An optional reply target must be a message in this same conversation.
+	let replyToMessageId: string | null = null;
+	if (raw?.replyToMessageId !== undefined && raw.replyToMessageId !== null) {
+		if (typeof raw.replyToMessageId !== 'string') {
+			throw error(400, 'replyToMessageId must be a string');
+		}
+		const target = await db
+			.prepare('SELECT id FROM messages WHERE id = ? AND conversation_id = ?')
+			.bind(raw.replyToMessageId, conversationId)
+			.first<{ id: string }>();
+		if (!target) throw error(400, 'replyToMessageId does not match a message in this conversation');
+		replyToMessageId = raw.replyToMessageId;
+	}
+
 	const message: Message = {
 		id: crypto.randomUUID(),
 		conversation_id: conversationId,
 		author_person_id: authorPersonId,
 		body,
 		source_transport: 'app',
-		created_at: nowIso()
+		created_at: nowIso(),
+		reply_to_message_id: replyToMessageId
 	};
 	await insertMessage(db, message);
 

@@ -37,6 +37,9 @@ export interface Message {
 	// Pinning (M37): NULL while unpinned, an ISO 8601 string once pinned.
 	// Omitted on insert — a new message is unpinned (NULL).
 	pinned_at?: string | null;
+	// Replies (M42): the id of the message this one replies to, or NULL for a
+	// normal message. Set once at creation, never changed.
+	reply_to_message_id?: string | null;
 }
 
 export interface DeliveryRow {
@@ -168,10 +171,19 @@ export async function listPeopleWithEndpoints(
 export async function insertMessage(db: D1Database, m: Message): Promise<void> {
 	await db
 		.prepare(
-			`INSERT INTO messages (id, conversation_id, author_person_id, body, source_transport, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?)`
+			`INSERT INTO messages
+			 (id, conversation_id, author_person_id, body, source_transport, created_at, reply_to_message_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`
 		)
-		.bind(m.id, m.conversation_id, m.author_person_id, m.body, m.source_transport, m.created_at)
+		.bind(
+			m.id,
+			m.conversation_id,
+			m.author_person_id,
+			m.body,
+			m.source_transport,
+			m.created_at,
+			m.reply_to_message_id ?? null
+		)
 		.run();
 }
 

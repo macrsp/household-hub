@@ -211,6 +211,11 @@ when each is reached.
 - [ ] **M40 — Household member management.** A `/household` page lists members
   and their endpoints and adds new ones; members and endpoints were seed-only
   before. A new member joins every conversation automatically.
+- [ ] **M41 — Custom domain.** `household.practicepartner.app` is attached to
+  the Pages project so the app — and the A2P campaign's URLs — sit on the
+  registered brand's own domain.
+- [ ] **M42 — Message replies.** A message can reply to an earlier message in
+  the same conversation; the reply shows a quoted reference to its target.
 
 ## Surprises & Discoveries
 
@@ -997,6 +1002,41 @@ post-deploy probes for all three classes already exist in
 (list with endpoints, add a member + post as them, 400 blank name, rename, 404
 unknown, add an endpoint, 400 bad type, 400 malformed email, 409 duplicate).
 No new try/catch wraps a user-asset write.
+
+**M41 — Custom domain.** Operational, not a code feature. `household
+.practicepartner.app` is attached as a custom domain to the `household-hub`
+Cloudflare Pages project (via the Pages API), so the app — and therefore the
+A2P campaign's website, terms, privacy, and opt-in URLs — sit on the
+registered brand's own domain (`practicepartner.app`) rather than the
+free `.pages.dev` subdomain. This removes the brand/URL-domain consistency
+risk an A2P reviewer could otherwise flag. The CNAME DNS record is added by
+the operator (the API token has Pages but not zone-DNS scope); once the domain
+is active, `wrangler.jsonc`'s `PUBLIC_APP_URL`, `.agent/a2p-campaign.md`, and
+the absolute-URL text on the terms/privacy/opt-in pages move to the new domain
+and the test-reset route's production-hostname block list gains it.
+
+**M42 — Message replies.** A message can reply to an earlier message in the
+same conversation. Migration `0010_message_replies.sql` adds a nullable
+`reply_to_message_id` column to `messages`; `insertMessage` writes it (NULL for
+a normal message). The app `POST` messages route accepts an optional
+`replyToMessageId` and validates that it names a message in the *same*
+conversation (400 otherwise). The messages list and the SSE stream expose
+`reply_to_message_id`. `+page.svelte` adds a Reply action to every message, a
+"Replying to …" banner above the composer, and a quoted reference above a
+reply's body (resolved client-side from the loaded messages). `scripts/probe-
+d1.mjs` gains a `messages — reply_to_message_id dangling` invariant.
+
+User-Asset Write-Path Checklist (M42): the touched class is `messages`. The
+write path is `insertMessage` in `src/lib/server/db.ts`, now writing the new
+`reply_to_message_id` column. The server gate is the `POST` handler in
+`src/routes/api/conversations/[slug]/messages/+server.ts`, which — when a
+`replyToMessageId` is supplied — requires it to be a string naming a message
+in the same conversation before the insert. No new string set, so no parity
+test. The post-deploy probe is the `messages — reply_to_message_id dangling`
+query in `scripts/probe-d1.mjs`; `e2e/api-replies.spec.ts` is the real-auth
+round-trip (a reply stores the target, a plain message is null, a bad target
+is 400, a cross-conversation target is 400). No new try/catch wraps the
+write — `insertMessage` is one statement.
 
 ## Concrete Steps
 
