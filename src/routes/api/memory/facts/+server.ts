@@ -8,6 +8,7 @@ import {
 	findEntityByName,
 	factsForSubject
 } from '$lib/server/db';
+import { indexFact, factSentence } from '$lib/server/memory-index';
 
 // The household memory graph (M71). Every route here is adult-gated: the
 // acting member's id is supplied by the caller, and a non-adult is refused
@@ -42,9 +43,10 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 	const validAt = typeof raw?.validAt === 'string' ? raw.validAt : null;
 	const objectIsEntity = raw?.objectIsEntity === true;
 
+	let fact;
 	try {
 		const subjectEntity = await upsertEntity(db, { kind: subjectKind, name: subject });
-		const fact = objectIsEntity
+		fact = objectIsEntity
 			? await insertFact(db, {
 					subject_id: subjectEntity.id,
 					predicate,
@@ -63,11 +65,18 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 					status: 'confirmed',
 					source: 'explicit'
 				});
-		return json(fact, { status: 201 });
 	} catch (e) {
 		// upsertEntity / insertFact reject a bad kind, source, or object shape.
 		throw error(400, (e as Error).message);
 	}
+
+	// Index the (confirmed) fact for semantic recall (M72) — best-effort,
+	// after the response via waitUntil; a no-op without Workers AI / Vectorize.
+	const indexTask = indexFact(platform!.env, fact.id, factSentence(subject, predicate, object));
+	if (platform?.context?.waitUntil) platform.context.waitUntil(indexTask);
+	else await indexTask;
+
+	return json(fact, { status: 201 });
 };
 
 // GET /api/memory/facts?subject=<name>&personId=<id> — the confirmed facts

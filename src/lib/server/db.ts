@@ -152,13 +152,14 @@ export async function listPeopleWithEndpoints(
 	Array<{
 		id: string;
 		display_name: string;
+		role: string;
 		created_at: string;
 		endpoints: Array<{ id: string; type: string; address: string }>;
 	}>
 > {
 	const { results: people } = await db
-		.prepare('SELECT id, display_name, created_at FROM people ORDER BY display_name')
-		.all<{ id: string; display_name: string; created_at: string }>();
+		.prepare('SELECT id, display_name, role, created_at FROM people ORDER BY display_name')
+		.all<{ id: string; display_name: string; role: string; created_at: string }>();
 	const { results: endpoints } = await db
 		.prepare('SELECT id, person_id, type, address FROM endpoints ORDER BY type, address')
 		.all<{ id: string; person_id: string; type: string; address: string }>();

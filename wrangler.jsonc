@@ -45,6 +45,10 @@
 		{
 			"binding": "VECTORIZE",
 			"index_name": "household-hub-messages"
+		},
+		{
+			"binding": "VECTORIZE_FACTS",
+			"index_name": "household-hub-facts"
 		}
 	]
 

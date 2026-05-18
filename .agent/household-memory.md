@@ -21,14 +21,14 @@ You can see it working when, after connecting the pieces, you open the Household
 ## Progress
 
 - [x] (2026-05-18 18:12Z) M71 — Memory graph schema and explicit capture: migration `0012_memory_graph.sql` (the two tables plus a `people.role` column), `memory-kinds.ts`, typed DB helpers (`upsertEntity`, `insertFact`, `confirmFact`, `factsForSubject`, `findEntityByName`, `isAdult`), adult-gated `/api/memory/facts` and `/api/memory/entities` routes, manifest updated, parity test `memory-kinds.test.ts`, E2E `api-memory.spec.ts`. Gates green: check 449 files, unit 134, build, e2e api-memory 5.
-- [ ] M72 — Semantic recall and the "Ask the household" UI: a `household-hub-facts` Vectorize index, fact embedding, the natural-language `/api/memory/ask` route, and a memory box on the Household page.
+- [x] (2026-05-18 18:22Z) M72 — Semantic recall and the "Ask the household" UI: the `household-hub-facts` Vectorize index created and bound as `VECTORIZE_FACTS`; `memory-index.ts` (`factSentence`, `indexFact`, `relevantFactIds`); explicit facts indexed on write; `POST /api/memory/ask` answering from recent + semantically-relevant facts; a "🧠 Household memory" box on the Household page with an adult asker selector. Gates green: check 453, unit 138, build, e2e api-memory 8.
 - [ ] M73 — AI fact extraction from conversations: candidate facts proposed after a message, a confirm/reject review UI, confirmed facts entering the graph.
 - [ ] M74 — Gmail OAuth connection (spike + build): the OAuth flow, the `google_accounts` table, token storage and refresh; validates the restricted-scope situation before any ingestion is built.
 - [ ] M75 — Gmail ingestion to fact extraction: cron-driven incremental sync, extraction into the propose→confirm loop, no raw email bodies stored.
 - [ ] M76 — Coordination view: a calendar over time-bound facts and a shared shopping list over `needs` facts.
 - [ ] M77 — The app's own changelog: when a dev-channel build merges, the runner posts a plain-language changelog entry into a channel (#6 from the brainstorm).
 
-M71 is complete and deployed. M72 is next.
+M71 and M72 are complete and deployed. M73 is next.
 
 
 ## Context and Orientation
