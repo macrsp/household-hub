@@ -1,17 +1,32 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
+import { relevantMessageIds } from '$lib/server/semantic-index';
 
 // The Workers AI text model used to answer a question about a conversation.
 const ASK_MODEL = '@cf/meta/llama-3.1-8b-instruct';
-// How many recent messages to feed the model as context.
-const ASK_WINDOW = 60;
+// A recent window kept for continuity, plus the semantically relevant messages
+// retrieved from anywhere in the conversation's history (M68).
+const RECENT_WINDOW = 30;
+const RELEVANT_K = 14;
 // Questions longer than this are rejected.
 const MAX_QUESTION = 500;
 
+interface Row {
+	id: string;
+	body: string;
+	author_name: string;
+	created_at: string;
+}
+
 // POST /api/conversations/[slug]/ask — answer a question about the
-// conversation using its recent messages, via Cloudflare Workers AI (M62).
-// Body: { question: non-empty string }. Returns { available, answer }.
+// conversation, via Cloudflare Workers AI (M62). Body: { question: non-empty
+// string }. Returns { available, answer }.
+//
+// The model sees the conversation's recent messages plus, when Vectorize is
+// configured, the messages most semantically relevant to the question from
+// anywhere in its history (M68) — so it can answer about something discussed
+// long ago, not only recently.
 //
 // Read-only — stores nothing, and posts nothing back into the conversation
 // (unlike the @claude assistant). Gated like the AI summary (M54): an unknown
@@ -41,27 +56,58 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		return json({ available: false, answer: '' }, { status: 503 });
 	}
 
-	// The most recent readable messages, oldest-first for the model.
-	const { results } = await db
+	// The most recent readable messages — continuity for the model.
+	const recent = await db
 		.prepare(
-			`SELECT body, author_name, created_at FROM (
-			   SELECT m.body, p.display_name AS author_name, m.created_at
+			`SELECT id, body, author_name, created_at FROM (
+			   SELECT m.id, m.body, p.display_name AS author_name, m.created_at
 			   FROM messages m
 			   JOIN people p ON p.id = m.author_person_id
 			   WHERE m.conversation_id = ? AND m.deleted_at IS NULL
 			   ORDER BY m.created_at DESC
-			   LIMIT ${ASK_WINDOW}
+			   LIMIT ${RECENT_WINDOW}
 			 )
 			 ORDER BY created_at ASC`
 		)
 		.bind(conversation.id)
-		.all<{ body: string; author_name: string; created_at: string }>();
+		.all<Row>();
 
-	if (results.length === 0) {
+	// Semantic retrieval (M68): the messages most relevant to the question,
+	// from anywhere in the conversation. Best-effort — empty without Vectorize,
+	// in which case only the recent window above is used.
+	let relevant: Row[] = [];
+	const relevantIds = await relevantMessageIds(
+		platform!.env,
+		conversation.id,
+		question,
+		RELEVANT_K
+	);
+	const recentIds = new Set(recent.results.map((r) => r.id));
+	const extraIds = relevantIds.filter((id) => !recentIds.has(id));
+	if (extraIds.length > 0) {
+		const placeholders = extraIds.map(() => '?').join(',');
+		const r = await db
+			.prepare(
+				`SELECT m.id, m.body, p.display_name AS author_name, m.created_at
+				 FROM messages m
+				 JOIN people p ON p.id = m.author_person_id
+				 WHERE m.deleted_at IS NULL AND m.id IN (${placeholders})`
+			)
+			.bind(...extraIds)
+			.all<Row>();
+		relevant = r.results;
+	}
+
+	// Merge recent + relevant, de-duped, in chronological order for the model.
+	const all = [...relevant, ...recent.results].sort((a, b) =>
+		a.created_at < b.created_at ? -1 : 1
+	);
+
+	if (all.length === 0) {
 		return json({ available: true, answer: 'This conversation has no messages yet.' });
 	}
 
-	const transcript = results.map((m) => `${m.author_name}: ${m.body}`).join('\n');
+	const transcript = all.map((m) => `${m.author_name}: ${m.body}`).join('\n');
 	const prompt = [
 		`Answer the question using ONLY this family conversation. If the`,
 		`answer is not in the messages, say you could not find it. Be concise`,

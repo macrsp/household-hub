@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { indexMessages } from './semantic-index';
+import { indexMessages, relevantMessageIds } from './semantic-index';
 
 // A stub env with Workers AI + Vectorize that records what gets upserted.
 function stubEnv() {
@@ -49,5 +49,39 @@ describe('indexMessages', () => {
 	it('is a no-op returning 0 for an empty batch', async () => {
 		const { env } = stubEnv();
 		expect(await indexMessages(env, [])).toBe(0);
+	});
+});
+
+describe('relevantMessageIds', () => {
+	it('returns the ids of the matched vectors, in order', async () => {
+		const env = {
+			AI: { run: async () => ({ data: [[0.1, 0.2]] }) },
+			VECTORIZE: {
+				query: async () => ({
+					matches: [
+						{ id: 'm9', score: 0.81 },
+						{ id: 'm3', score: 0.62 }
+					]
+				})
+			}
+		} as unknown as App.Platform['env'];
+		expect(await relevantMessageIds(env, 'c1', 'where is the trip')).toEqual(['m9', 'm3']);
+	});
+
+	it('returns [] when Vectorize is absent', async () => {
+		const env = { AI: {} } as unknown as App.Platform['env'];
+		expect(await relevantMessageIds(env, 'c1', 'q')).toEqual([]);
+	});
+
+	it('returns [] when the query throws', async () => {
+		const env = {
+			AI: { run: async () => ({ data: [[0.1]] }) },
+			VECTORIZE: {
+				query: async () => {
+					throw new Error('boom');
+				}
+			}
+		} as unknown as App.Platform['env'];
+		expect(await relevantMessageIds(env, 'c1', 'q')).toEqual([]);
 	});
 });
