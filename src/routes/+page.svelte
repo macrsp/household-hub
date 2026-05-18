@@ -111,6 +111,12 @@
 	// AI conversation auto-title (M59): suggesting a name in the Manage panel.
 	let titleSuggesting = $state(false);
 	let titleError = $state('');
+	// AI "ask this conversation" Q&A (M62).
+	let askOpen = $state(false);
+	let askQuestion = $state('');
+	let askAnswer = $state('');
+	let askError = $state('');
+	let askLoading = $state(false);
 	// AI per-message translation (M60): the message currently being translated.
 	let translationFor = $state('');
 	let translationText = $state('');
@@ -335,6 +341,7 @@
 		dismissActions();
 		dismissSuggestions();
 		dismissTranslation();
+		dismissAsk();
 		atBottom = true;
 		openStream();
 		loadPrefs();
@@ -469,6 +476,47 @@
 		actionItems = [];
 		actionsError = '';
 		actionsShown = false;
+	}
+
+	// AI "ask this conversation" (M62): answer a question from the thread's
+	// recent messages, without posting anything into the conversation.
+	function toggleAsk() {
+		askOpen = !askOpen;
+		if (!askOpen) dismissAsk();
+	}
+
+	async function submitAsk() {
+		const question = askQuestion.trim();
+		if (question === '' || askLoading) return;
+		askAnswer = '';
+		askError = '';
+		askLoading = true;
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/ask`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ question })
+			});
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; answer?: string }
+				| null;
+			if (res.ok && data?.available && data.answer) {
+				askAnswer = data.answer;
+			} else {
+				askError = 'An answer isn’t available right now.';
+			}
+		} catch {
+			askError = 'Could not reach the assistant — network error.';
+		} finally {
+			askLoading = false;
+		}
+	}
+
+	function dismissAsk() {
+		askOpen = false;
+		askQuestion = '';
+		askAnswer = '';
+		askError = '';
 	}
 
 	// AI reply suggestions (M57): draft a few short replies for the reader.
@@ -1206,6 +1254,9 @@
 				>
 					{suggestionsLoading ? 'Thinking…' : '💬 Suggest a reply'}
 				</button>
+				<button type="button" class="conv-tab conv-summary" onclick={toggleAsk}>
+					{askOpen ? '❓ Close' : '❓ Ask'}
+				</button>
 			{/if}
 			{#if archivedConversations.length > 0}
 				<button
@@ -1334,9 +1385,45 @@
 				<button type="button" onclick={clearSearch}>Clear</button>
 			{/if}
 		</form>
+		{#if askOpen}
+			<form
+				class="ask-form"
+				onsubmit={(e) => {
+					e.preventDefault();
+					submitAsk();
+				}}
+			>
+				<input
+					type="text"
+					placeholder="Ask about this conversation…"
+					bind:value={askQuestion}
+					autocomplete="off"
+				/>
+				<button type="submit" disabled={askLoading || askQuestion.trim() === ''}>
+					{askLoading ? 'Asking…' : 'Ask'}
+				</button>
+			</form>
+		{/if}
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite" onscroll={updateAtBottom}>
+		{#if askAnswer || askError}
+			<div class="summary-bar">
+				<span class="summary-icon" aria-hidden="true">❓</span>
+				<span class="summary-text">{askError || askAnswer}</span>
+				<button
+					type="button"
+					class="summary-dismiss"
+					onclick={() => {
+						askAnswer = '';
+						askError = '';
+					}}
+					aria-label="Dismiss answer"
+				>
+					✕
+				</button>
+			</div>
+		{/if}
 		{#if summaryText || summaryError}
 			<div class="summary-bar">
 				<span class="summary-icon" aria-hidden="true">✨</span>
@@ -1900,6 +1987,31 @@
 		display: flex;
 		gap: 0.4rem;
 		margin-top: 0.5rem;
+	}
+
+	.ask-form {
+		display: flex;
+		gap: 0.4rem;
+		margin-top: 0.4rem;
+	}
+
+	.ask-form input {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.85rem;
+	}
+
+	.ask-form button {
+		font-size: 0.8rem;
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--on-accent);
+		cursor: pointer;
+	}
+
+	.ask-form button:disabled {
+		cursor: default;
+		opacity: 0.6;
 	}
 
 	.search input[type='search'] {

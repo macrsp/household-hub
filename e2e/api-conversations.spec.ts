@@ -175,6 +175,33 @@ test.describe('conversations API', () => {
 		expect(res.status()).toBe(404);
 	});
 
+	test('the AI ask endpoint responds without crashing (M62)', async ({ request }) => {
+		await postMessage(request, { body: 'the picnic is on Saturday at noon' });
+		const res = await request.post('/api/conversations/general/ask', {
+			data: { question: 'when is the picnic?' }
+		});
+		// The E2E server has no Workers AI auth, so the endpoint reports the
+		// answer unavailable (503) rather than erroring.
+		expect([200, 503]).toContain(res.status());
+		const data = await res.json();
+		expect(typeof data.available).toBe('boolean');
+		expect(typeof data.answer).toBe('string');
+	});
+
+	test('the AI ask endpoint rejects an empty question with 400 (M62)', async ({ request }) => {
+		const res = await request.post('/api/conversations/general/ask', {
+			data: { question: '  ' }
+		});
+		expect(res.status()).toBe(400);
+	});
+
+	test('the AI ask endpoint 404s for an unknown conversation (M62)', async ({ request }) => {
+		const res = await request.post('/api/conversations/no-such-thread/ask', {
+			data: { question: 'anything?' }
+		});
+		expect(res.status()).toBe(404);
+	});
+
 	test('exports a conversation as a JSON download (M49)', async ({ request }) => {
 		await postMessage(request, { body: 'json export line' });
 
