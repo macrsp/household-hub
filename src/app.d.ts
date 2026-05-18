@@ -27,6 +27,9 @@ declare global {
 				// Public base URL of the deployed app (not a secret) — used to
 				// build the Twilio delivery-status callback URL.
 				PUBLIC_APP_URL?: string;
+				// Cloudflare Workers AI binding. Present in production; absent
+				// in local/CI, where AI features report themselves unavailable.
+				AI?: Ai;
 			};
 		}
 	}

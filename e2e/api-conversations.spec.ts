@@ -104,6 +104,21 @@ test.describe('conversations API', () => {
 		expect(text).toContain('exported line one');
 	});
 
+	test('the AI summary endpoint responds without crashing (M54)', async ({ request }) => {
+		await postMessage(request, { body: 'something to summarise' });
+		const res = await request.get('/api/conversations/general/summary');
+		// The E2E server has no Workers AI auth, so the endpoint reports the
+		// summary unavailable (503) rather than erroring.
+		expect([200, 503]).toContain(res.status());
+		const data = await res.json();
+		expect(typeof data.available).toBe('boolean');
+	});
+
+	test('the AI summary endpoint 404s for an unknown conversation (M54)', async ({ request }) => {
+		const res = await request.get('/api/conversations/no-such-thread/summary');
+		expect(res.status()).toBe(404);
+	});
+
 	test('exports a conversation as a JSON download (M49)', async ({ request }) => {
 		await postMessage(request, { body: 'json export line' });
 
