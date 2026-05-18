@@ -31,6 +31,28 @@ test.describe('conversations API', () => {
 		expect(list.some((c) => c.slug === 'weekend-trip')).toBe(true);
 	});
 
+	test('creates a conversation with only the chosen members (M47)', async ({ request }) => {
+		const res = await request.post('/api/conversations', {
+			data: { name: 'Parents', slug: 'parents', personIds: ['person-matt', 'person-two'] }
+		});
+		expect(res.status(), await res.text()).toBe(201);
+
+		const members = await (
+			await request.get('/api/conversations/parents/participants')
+		).json();
+		expect(members.map((m: { person_id: string }) => m.person_id).sort()).toEqual([
+			'person-matt',
+			'person-two'
+		]);
+	});
+
+	test('rejects creation with an unknown personId (M47)', async ({ request }) => {
+		const res = await request.post('/api/conversations', {
+			data: { name: 'Bad', slug: 'bad-thread', personIds: ['person-nobody'] }
+		});
+		expect(res.status()).toBe(400);
+	});
+
 	test('rejects a duplicate slug with 409', async ({ request }) => {
 		const res = await request.post('/api/conversations', {
 			data: { name: 'General Again', slug: 'general' }
