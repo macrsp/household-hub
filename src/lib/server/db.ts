@@ -7,6 +7,7 @@
 
 import { nowIso } from './time';
 import type { DeliveryPreference } from '../preferences';
+import { REACTION_EMOJI } from '../reactions';
 
 // Single source of truth for the transport string sets. The schema CHECK
 // constraints in migrations/0001_initial.sql mirror these — keep them in sync
@@ -124,6 +125,90 @@ export async function editMessage(
 		.bind(body, nowIso(), messageId, authorPersonId)
 		.run();
 	return (res.meta.changes ?? 0) > 0;
+}
+
+/** One emoji's reaction tally on a message: the count and who reacted. */
+export interface ReactionSummary {
+	emoji: string;
+	count: number;
+	people: string[];
+}
+
+/**
+ * Toggle one person's emoji reaction on a message (M36): if the person
+ * already holds that emoji on that message it is removed, otherwise it is
+ * added. Returns which way it went. The UNIQUE(message_id, person_id, emoji)
+ * constraint keeps a reaction idempotent. The only runtime write path to
+ * `reactions`.
+ */
+export async function toggleReaction(
+	db: D1Database,
+	messageId: string,
+	personId: string,
+	emoji: string
+): Promise<'added' | 'removed'> {
+	const existing = await db
+		.prepare('SELECT id FROM reactions WHERE message_id = ? AND person_id = ? AND emoji = ?')
+		.bind(messageId, personId, emoji)
+		.first<{ id: string }>();
+	if (existing) {
+		await db
+			.prepare('DELETE FROM reactions WHERE message_id = ? AND person_id = ? AND emoji = ?')
+			.bind(messageId, personId, emoji)
+			.run();
+		return 'removed';
+	}
+	await db
+		.prepare(
+			'INSERT INTO reactions (id, message_id, person_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)'
+		)
+		.bind(crypto.randomUUID(), messageId, personId, emoji, nowIso())
+		.run();
+	return 'added';
+}
+
+/**
+ * Load reaction tallies for a set of messages, grouped by message id. Each
+ * message maps to an array of per-emoji summaries ordered by `REACTION_EMOJI`;
+ * a message with no reactions is absent from the map.
+ */
+export async function loadReactions(
+	db: D1Database,
+	messageIds: string[]
+): Promise<Map<string, ReactionSummary[]>> {
+	const out = new Map<string, ReactionSummary[]>();
+	if (messageIds.length === 0) return out;
+
+	const placeholders = messageIds.map(() => '?').join(',');
+	const { results } = await db
+		.prepare(
+			`SELECT message_id, emoji, person_id FROM reactions WHERE message_id IN (${placeholders})`
+		)
+		.bind(...messageIds)
+		.all<{ message_id: string; emoji: string; person_id: string }>();
+
+	// message_id -> emoji -> person_ids
+	const byMessage = new Map<string, Map<string, string[]>>();
+	for (const row of results) {
+		let emojiMap = byMessage.get(row.message_id);
+		if (!emojiMap) {
+			emojiMap = new Map();
+			byMessage.set(row.message_id, emojiMap);
+		}
+		const people = emojiMap.get(row.emoji);
+		if (people) people.push(row.person_id);
+		else emojiMap.set(row.emoji, [row.person_id]);
+	}
+
+	for (const [messageId, emojiMap] of byMessage) {
+		const summaries: ReactionSummary[] = [];
+		for (const emoji of REACTION_EMOJI) {
+			const people = emojiMap.get(emoji);
+			if (people && people.length > 0) summaries.push({ emoji, count: people.length, people });
+		}
+		if (summaries.length > 0) out.set(messageId, summaries);
+	}
+	return out;
 }
 
 /** Insert one delivery attempt row (typically with status 'pending'). */

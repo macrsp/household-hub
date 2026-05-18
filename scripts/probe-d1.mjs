@@ -72,6 +72,13 @@ const PROBES = [
 		sql:
 			'SELECT count(*) AS n FROM sms_consents ' +
 			"WHERE name IS NULL OR name = '' OR phone IS NULL OR phone = ''"
+	},
+	{
+		name: 'reactions — dangling message_id / person_id',
+		sql:
+			'SELECT count(*) AS n FROM reactions ' +
+			'WHERE message_id NOT IN (SELECT id FROM messages) ' +
+			'OR person_id NOT IN (SELECT id FROM people)'
 	}
 ];
 

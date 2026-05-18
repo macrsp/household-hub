@@ -195,6 +195,9 @@ when each is reached.
   corrects the `/sms-terms` carrier-liability wording, and adds
   `.agent/a2p-campaign.md` — the exact, field-by-field model campaign to enter
   on resubmission.
+- [ ] **M36 — Message reactions.** Household members can react to a message
+  with one of a fixed emoji set; reactions are tallied per message, toggle on
+  and off, and propagate to every open client over the SSE stream.
 
 ## Surprises & Discoveries
 
@@ -832,6 +835,44 @@ brand-named opt-in confirmation / opt-out / HELP messages with the frequency
 and rate disclosures the guide requires), plus a table of what changed since
 the rejected submission. The privacy policy already carried the non-sharing
 statement, frequency, and rate disclosures, so it needed no change.
+
+**M36 — Message reactions.** Household members can react to a message with an
+emoji. Migration `0007_reactions.sql` creates a `reactions` table — one row
+per `(message_id, person_id, emoji)`, with a UNIQUE constraint that keeps a
+reaction idempotent. `src/lib/reactions.ts` is the single source of truth for
+the accepted emoji set (`REACTION_EMOJI`) and exports `isReactionEmoji`; the
+`emoji` column is deliberately free text with no CHECK, so there is no schema
+copy of the set to drift. The write path is `toggleReaction` in `db.ts` (adds
+the row, or removes it if the person already holds that emoji);
+`loadReactions` aggregates a set of messages into per-emoji `{emoji, count,
+people}` summaries. A new route
+`POST /api/conversations/[slug]/messages/[id]/reactions` validates the
+`{personId, emoji}` body, requires the message and the person to exist, then
+toggles. The messages list and the SSE stream attach `reactions` to each
+message; the stream's change marker gains a reaction signature so a reaction
+re-emits the message to every open client. `+page.svelte` shows reaction
+chips under each message (highlighted when the active sender reacted) and a
+`+` picker; toggling is optimistic and reconciled by the stream.
+`scripts/probe-d1.mjs` gains a `reactions` probe, the `/api/test/reset` route
+wipes the table, and `e2e/api-reactions.spec.ts` plus `reactions.test.ts`
+cover the route and the emoji-set validator.
+
+User-Asset Write-Path Checklist (M36): the touched class is the new
+`reactions` table. The write path is the single typed helper `toggleReaction`
+in `src/lib/server/db.ts`; the server gate is the `POST` handler in
+`src/routes/api/conversations/[slug]/messages/[id]/reactions/+server.ts`,
+which requires a known `personId`, an `emoji` accepted by `isReactionEmoji`,
+and an existing message in the conversation. The accepted emoji set is the
+single declaration `REACTION_EMOJI` in `src/lib/reactions.ts`, imported by
+both the client picker and the server validator — invariant 3 is satisfied
+with no schema duplication. `src/lib/reactions.test.ts` enumerates
+`REACTION_EMOJI` and asserts `isReactionEmoji` accepts every entry and rejects
+others — the parity test required by invariant 3. The post-deploy probe is
+`reactions — dangling message_id / person_id` in `scripts/probe-d1.mjs`;
+`e2e/api-reactions.spec.ts` is the real-auth round-trip (toggle on/off, tally,
+400 on a bad emoji, 400 on an unknown person, 404 on an unknown message). No
+new try/catch wraps the write — `toggleReaction` issues one statement per
+branch and a failure throws to a 500 (no silent fallback).
 
 ## Concrete Steps
 
