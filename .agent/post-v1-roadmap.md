@@ -280,6 +280,10 @@ when each is reached.
   opens an inline panel that translates it into a chosen language via Workers
   AI, with a language picker to re-translate. Stateless — writes nothing — and
   gated like compose-assist (M58).
+- [x] **M61 — AI household digest.** A "What's new" button on the Household
+  page summarises the last day's activity across every active conversation via
+  Workers AI, grouped by conversation. Read-only and gated like the AI summary
+  (M54).
 
 ## Surprises & Discoveries
 
@@ -1373,6 +1377,19 @@ Workers AI binding or a failed call is `503 { available: false }`. A "Translate"
 action on each message opens an inline panel with a language `<select>` that
 re-translates on change; the panel clears on a thread switch. Stateless — no
 database write, no Write-Path Checklist entry.
+
+**M61 — AI household digest.** The first cross-conversation AI feature.
+`GET /api/digest` gathers the last 24 hours of readable messages across every
+non-archived conversation (capped at 80) and asks `@cf/meta/llama-3.1-8b-
+instruct` for a digest grouped by conversation. `src/lib/server/digest.ts`
+holds two pure helpers — `formatDigestSections` (groups rows under a "## Name"
+header per conversation, preserving first-appearance order) and `digestSince`
+(the ISO lower bound of the window) — unit-covered in `digest.test.ts`
+(4 cases). It is a top-level route, not under `/api/conversations`, since it
+spans all of them. Gating matches the summary: no Workers AI binding or a
+failed call is `503 { available: false }`; a quiet last day is a non-failure
+`200 { available: true, digest: '' }`. The Household page gains a "What's new"
+button that renders the digest. Read-only — no Write-Path Checklist entry.
 
 ## Concrete Steps
 
