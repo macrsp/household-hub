@@ -10,12 +10,22 @@
 
 import { insertMessage, type Message } from './db';
 import { fanoutMessage } from './fanout';
+import { relevantMessageIds } from './semantic-index';
 
 const ASSISTANT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 const CLAUDE_PERSON_ID = 'person-claude';
 const DEV_CHANNEL_SLUG = 'claude';
-// Recent messages fed to the model for context.
+// Recent messages fed to the model for context, plus the messages most
+// relevant to the question retrieved from anywhere in the conversation (M69).
 const CONTEXT_WINDOW = 16;
+const RELEVANT_K = 12;
+
+interface ContextRow {
+	id: string;
+	body: string;
+	author_name: string;
+	created_at: string;
+}
 
 /** Whether a message body @-mentions Claude. */
 export function mentionsClaude(body: string): boolean {
@@ -46,11 +56,11 @@ export async function maybeAssistantReply(
 	if (!ai) return;
 
 	try {
-		// Pull recent context (oldest-first), excluding deleted messages.
-		const { results } = await db
+		// Recent context (oldest-first), excluding deleted messages.
+		const recent = await db
 			.prepare(
-				`SELECT body, author_name, created_at FROM (
-				   SELECT m.body, p.display_name AS author_name, m.created_at
+				`SELECT id, body, author_name, created_at FROM (
+				   SELECT m.id, m.body, p.display_name AS author_name, m.created_at
 				   FROM messages m
 				   JOIN people p ON p.id = m.author_person_id
 				   WHERE m.conversation_id = ? AND m.deleted_at IS NULL
@@ -60,8 +70,35 @@ export async function maybeAssistantReply(
 				 ORDER BY created_at ASC`
 			)
 			.bind(conversation.id)
-			.all<{ body: string; author_name: string; created_at: string }>();
-		const transcript = results.map((m) => `${m.author_name}: ${m.body}`).join('\n');
+			.all<ContextRow>();
+
+		// Plus the messages most relevant to the question, from anywhere in the
+		// conversation (M69) — best-effort, empty without Vectorize. The
+		// triggering message is excluded: it may not be indexed yet, and it is
+		// already in the recent window.
+		let relevant: ContextRow[] = [];
+		const relevantIds = await relevantMessageIds(env, conversation.id, message.body, RELEVANT_K);
+		const recentIds = new Set(recent.results.map((r) => r.id));
+		const extraIds = relevantIds.filter((id) => !recentIds.has(id) && id !== message.id);
+		if (extraIds.length > 0) {
+			const placeholders = extraIds.map(() => '?').join(',');
+			const r = await db
+				.prepare(
+					`SELECT m.id, m.body, p.display_name AS author_name, m.created_at
+					 FROM messages m
+					 JOIN people p ON p.id = m.author_person_id
+					 WHERE m.deleted_at IS NULL AND m.id IN (${placeholders})`
+				)
+				.bind(...extraIds)
+				.all<ContextRow>();
+			relevant = r.results;
+		}
+
+		// Merge relevant + recent, de-duped, in chronological order.
+		const transcript = [...relevant, ...recent.results]
+			.sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
+			.map((m) => `${m.author_name}: ${m.body}`)
+			.join('\n');
 
 		const result = (await ai.run(ASSISTANT_MODEL, {
 			messages: [

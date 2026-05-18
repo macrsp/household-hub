@@ -310,6 +310,10 @@ when each is reached.
   feeds the model the messages most relevant to the question — retrieved from
   anywhere in the conversation's history via Vectorize — alongside a recent
   window, so it can answer about something discussed long ago.
+- [x] **M69 — Semantic retrieval for the @claude assistant.** The in-app
+  assistant (M55) now draws on the messages most relevant to the @claude
+  mention from the whole conversation, via Vectorize, alongside its recent
+  window — the same retrieval upgrade as M68, applied to the assistant.
 
 ## Surprises & Discoveries
 
@@ -1531,6 +1535,18 @@ prompts the model with the union. When Vectorize is unconfigured (local/CI) it
 degrades cleanly to just the recent window — the route's 503 gating is
 unchanged. `relevantMessageIds` is unit-covered with a stub Vectorize (matched
 ids in order, no-binding no-op, query-throw no-op). Read-only — no write path.
+
+**M69 — Semantic retrieval for the @claude assistant.** The same retrieval
+upgrade as M68, applied to the in-app `@claude` assistant (M55).
+`maybeAssistantReply` previously fed the model a flat 16-message recent window;
+it now also pulls the messages most relevant to the @claude mention from
+anywhere in the conversation via `relevantMessageIds`, merged chronologically
+with the recent window. The triggering message is excluded from the retrieved
+set — it shares `waitUntil` with `indexMessage` so may not be indexed yet, and
+it is already in the recent window. Best-effort: with no Vectorize binding the
+retrieval returns `[]` and the assistant falls back to exactly its prior
+recent-window behaviour. The `messages` write path (the assistant's
+`person-claude` reply) is unchanged — the M55 Write-Path note still holds.
 
 ## Concrete Steps
 
