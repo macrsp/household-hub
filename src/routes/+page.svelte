@@ -10,6 +10,7 @@
 		relativeTime
 	} from '$lib/message-format';
 	import { REACTION_EMOJI } from '$lib/reactions';
+	import { TRANSLATE_LANGUAGES } from '$lib/languages';
 
 	interface Person {
 		id: string;
@@ -110,6 +111,12 @@
 	// AI conversation auto-title (M59): suggesting a name in the Manage panel.
 	let titleSuggesting = $state(false);
 	let titleError = $state('');
+	// AI per-message translation (M60): the message currently being translated.
+	let translationFor = $state('');
+	let translationText = $state('');
+	let translationLang = $state('English');
+	let translationLoading = $state(false);
+	let translationError = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Member ids selected for a new conversation (M47) — defaults to everyone.
@@ -327,6 +334,7 @@
 		dismissSummary();
 		dismissActions();
 		dismissSuggestions();
+		dismissTranslation();
 		atBottom = true;
 		openStream();
 		loadPrefs();
@@ -495,6 +503,49 @@
 	function dismissSuggestions() {
 		replySuggestions = [];
 		suggestionsError = '';
+	}
+
+	// AI per-message translation (M60). Clicking "Translate" opens an inline
+	// panel under the message; clicking it again, or ✕, closes it.
+	function translateMessage(message: Message) {
+		if (translationFor === message.id) {
+			dismissTranslation();
+			return;
+		}
+		translationFor = message.id;
+		translationLang = 'English';
+		runTranslation(message.body);
+	}
+
+	async function runTranslation(text: string) {
+		translationText = '';
+		translationError = '';
+		translationLoading = true;
+		try {
+			const res = await fetch('/api/assist/translate', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ text, to: translationLang })
+			});
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; text?: string }
+				| null;
+			if (res.ok && data?.available && data.text) {
+				translationText = data.text;
+			} else {
+				translationError = 'Translation isn’t available right now.';
+			}
+		} catch {
+			translationError = 'Could not translate — network error.';
+		} finally {
+			translationLoading = false;
+		}
+	}
+
+	function dismissTranslation() {
+		translationFor = '';
+		translationText = '';
+		translationError = '';
 	}
 
 	// AI compose-assist (M58): rewrite the current draft more clearly.
@@ -1476,9 +1527,51 @@
 								</span>
 							{/if}
 						</div>
+						{#if translationFor === message.id}
+							<div class="translation">
+								<div class="translation-head">
+									<label class="translation-lang">
+										<span class="sr-only">Translate to</span>
+										<select
+											value={translationLang}
+											onchange={(e) => {
+												translationLang = e.currentTarget.value;
+												runTranslation(message.body);
+											}}
+										>
+											{#each TRANSLATE_LANGUAGES as lang (lang)}
+												<option value={lang}>{lang}</option>
+											{/each}
+										</select>
+									</label>
+									<button
+										type="button"
+										class="action-btn"
+										onclick={dismissTranslation}
+										aria-label="Hide translation"
+									>
+										✕
+									</button>
+								</div>
+								{#if translationLoading}
+									<p class="translation-text dim">Translating…</p>
+								{:else if translationError}
+									<p class="translation-text dim">{translationError}</p>
+								{:else}
+									<p class="translation-text">{translationText}</p>
+								{/if}
+							</div>
+						{/if}
 						<div class="msg-actions">
 							<button type="button" class="action-btn" onclick={() => startReply(message)}>
 								Reply
+							</button>
+							<button
+								type="button"
+								class="action-btn"
+								onclick={() => translateMessage(message)}
+							>
+								{translationFor === message.id ? 'Hide translation' : 'Translate'}
 							</button>
 							<button
 								type="button"
@@ -1972,6 +2065,36 @@
 		justify-content: flex-end;
 		gap: 0.35rem;
 		margin-top: 0.3rem;
+	}
+
+	.translation {
+		margin-top: 0.4rem;
+		padding: 0.45rem 0.6rem;
+		background: var(--raised);
+		border: 1px solid var(--accent);
+		border-radius: 0.45rem;
+	}
+
+	.translation-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.translation-lang select {
+		padding: 0.15rem 0.3rem;
+		font-size: 0.72rem;
+	}
+
+	.translation-text {
+		margin: 0.35rem 0 0;
+		font-size: 0.85rem;
+		white-space: pre-wrap;
+	}
+
+	.translation-text.dim {
+		color: var(--dim);
 	}
 
 	.action-btn {

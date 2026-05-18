@@ -276,6 +276,10 @@ when each is reached.
   Workers AI and drops it into the rename field, where the user reviews it and
   saves via the existing rename path. Read-only and gated like the AI summary
   (M54).
+- [x] **M60 — Per-message AI translation.** A "Translate" action on any message
+  opens an inline panel that translates it into a chosen language via Workers
+  AI, with a language picker to re-translate. Stateless — writes nothing — and
+  gated like compose-assist (M58).
 
 ## Surprises & Discoveries
 
@@ -1355,6 +1359,20 @@ button that drops the suggestion into the existing rename field — the AI never
 writes the name itself; the user reviews it and saves through the existing
 `PATCH /api/conversations/[slug]` rename path, so no new `conversations` write
 path and no Write-Path Checklist entry.
+
+**M60 — Per-message AI translation.** `POST /api/assist/translate` takes a
+message and a target language and asks `@cf/meta/llama-3.1-8b-instruct` to
+translate it, reusing M58's `cleanRewrite` to strip any preamble. The supported
+languages live in `src/lib/languages.ts` — outside `$lib/server` because the
+message UI's picker imports them too. `src/lib/server/translate.ts` holds the
+pure `resolveLanguage` helper (case-insensitive match against the list, English
+fallback), unit-covered in `translate.test.ts` (4 cases); it imports the list
+by relative path (`../languages`) since the vitest setup does not alias `$lib`.
+Gating matches compose-assist: an empty or over-long `text` is a 400, no
+Workers AI binding or a failed call is `503 { available: false }`. A "Translate"
+action on each message opens an inline panel with a language `<select>` that
+re-translates on change; the panel clears on a thread switch. Stateless — no
+database write, no Write-Path Checklist entry.
 
 ## Concrete Steps
 
