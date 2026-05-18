@@ -177,6 +177,9 @@ when each is reached.
   message/conversation API, the webhook authentication gates, and the
   conversation UI — backed by a gated test-only `/api/test/reset` route, and
   wired into CI.
+- [ ] **M32 — Unit-test the message-format helpers.** The pure presentation
+  helpers (`linkify`, `personHue`, `initial`, `dayKey`, `dayLabel`) move out of
+  `+page.svelte` into `$lib/message-format.ts` and gain a unit-test suite.
 
 ## Surprises & Discoveries
 
@@ -742,6 +745,19 @@ parity test is needed; the existing post-deploy probes still cover all six
 classes (the route adds no new record class). No new try/catch wraps the
 write: the reset runs as one atomic `db.batch()`, and a failure throws to a
 500 (no silent fallback).
+
+**M32 — Unit-test the message-format helpers.** A test-only refactor — no API,
+database, or write path is touched, so no Write-Path Checklist. The pure
+presentation helpers that lived inside `+page.svelte` (`linkify`, `personHue`,
+`initial`, `dayKey`, `dayLabel`) move verbatim into a new `$lib/message-format
+.ts` module; `+page.svelte` imports them instead of defining them inline.
+`dayLabel` gains an optional `now` parameter (default `new Date()`) so its
+Today/Yesterday branches are deterministically testable. `src/lib/message-
+format.test.ts` adds 17 unit cases — URL segmenting and punctuation trimming,
+stable per-person hues, avatar initials, and calendar-day grouping. The
+day-grouping fixtures are built with the local-time `Date` constructor so the
+assertions hold regardless of the test runner's timezone (an early version
+keyed on `Z`-literal timestamps that straddled local midnight).
 
 ## Concrete Steps
 
