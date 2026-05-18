@@ -46,7 +46,7 @@
 	<h2>SMS / text messaging</h2>
 	<p>
 		A household member consents to receive SMS messages by completing the opt-in form
-		at <a href="/sms-opt-in">household-hub.pages.dev/sms-opt-in</a>, where they provide
+		at <a href="/sms-opt-in">household.practicepartner.app/sms-opt-in</a>, where they provide
 		their mobile number and explicitly agree to take part. SMS messages relay messages
 		that other members of the same household have sent. Message frequency varies with
 		household activity. Message and data rates may apply. Reply <strong>STOP</strong> to
