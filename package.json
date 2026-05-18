@@ -11,6 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:unit": "vitest run --passWithNoTests",
+		"test:e2e": "playwright test",
+		"test:e2e:install": "playwright install --with-deps chromium",
 		"db:migrate:local": "wrangler d1 migrations apply household-hub-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply household-hub-db --remote",
 		"db:seed:local": "wrangler d1 execute household-hub-db --local --file ./seed.sql",
@@ -21,6 +23,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20260516.1",
+		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",

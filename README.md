@@ -71,6 +71,17 @@ lives under `.wrangler/` (git-ignored); delete that directory to start fresh.
 
 Gates: `npm run check` (type-check), `npm run build`, `npm run test:unit`.
 
+## Testing
+
+- `npm run test:unit` — Vitest unit tests over the pure server helpers
+  (`src/lib/server`).
+- `npm run test:e2e` — Playwright end-to-end lane. It builds the app, applies
+  the D1 migrations to a local database, starts `wrangler pages dev`, and
+  drives the real API, the webhook authentication gates, and the conversation
+  UI with no request mocking. First run only: `npm run test:e2e:install` to
+  fetch the Chromium browser. The suite resets D1 through a gated test-only
+  route (`POST /api/test/reset`) that is inert in production.
+
 ## Cloudflare setup
 
 `wrangler` is already authenticated for interactive use, but **automated and
