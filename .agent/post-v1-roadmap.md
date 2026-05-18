@@ -225,6 +225,8 @@ when each is reached.
 - [ ] **M45 — Global search.** `GET /api/search?q=` searches message bodies
   across every conversation; an "All" toggle by the search box shows a
   cross-conversation results list, each row jumping to its thread.
+- [ ] **M46 — @mentions.** An `@name` referring to a household member renders
+  highlighted in the message body.
 
 ## Surprises & Discoveries
 
@@ -1094,6 +1096,17 @@ replaced by a dedicated results list — each row shows the conversation, author
 body, and relative time, and clicking it jumps to that thread. `e2e/api-search
 .spec.ts` covers cross-conversation matches, soft-deleted exclusion, the
 missing-term 400, and an empty result.
+
+**M46 — @mentions.** Presentation only — no API, database, or write path is
+touched, so no Write-Path Checklist. `$lib/message-format.ts` gains
+`parseBody(text, mentionNames)`, which splits a body into `text`, `link`, and
+`mention` segments: it runs `linkify` for URLs, then within each text run
+marks `@name` as a `mention` when `name` (case-insensitive) is a household
+member. An `@word` matching no member stays plain text. `+page.svelte` derives
+`mentionNames` from the members' first names and renders the body with
+`parseBody` — a `mention` segment becomes a highlighted `<span>`; as before,
+every segment is bound as text/attribute, never `{@html}`, so a body cannot
+inject markup. `message-format.test.ts` adds six `parseBody` cases.
 
 ## Concrete Steps
 
