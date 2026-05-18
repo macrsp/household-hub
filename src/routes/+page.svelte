@@ -87,6 +87,11 @@
 	// Desktop notifications (M28): the current Notification permission, and the
 	// time the live stream connected — messages older than this are backlog.
 	let notifyPermission = $state('default');
+	// Web Push (M38): whether the server has push configured, and whether this
+	// browser is subscribed. `pushPublicKey` is the VAPID key for subscribing.
+	let pushAvailable = $state(false);
+	let pushSubscribed = $state(false);
+	let pushPublicKey = '';
 	let streamOpenedAt = '';
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
@@ -458,6 +463,60 @@
 		}
 	}
 
+	// Web Push (M38). Decode the base64url VAPID key the PushManager wants
+	// into an ArrayBuffer-backed Uint8Array (a valid BufferSource).
+	function urlBase64ToUint8Array(base64: string) {
+		const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+		const normalized = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+		const raw = atob(normalized);
+		const buffer = new ArrayBuffer(raw.length);
+		const out = new Uint8Array(buffer);
+		for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+		return out;
+	}
+
+	// On load: learn whether the server has push configured and whether this
+	// browser is already subscribed — drives the "Enable push" button.
+	async function initPush() {
+		if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+		try {
+			const res = await fetch('/api/push/public-key');
+			if (!res.ok) return; // push not configured on the server
+			const data = (await res.json()) as { publicKey: string };
+			pushPublicKey = data.publicKey;
+			pushAvailable = true;
+			const registration = await navigator.serviceWorker.ready;
+			pushSubscribed = (await registration.pushManager.getSubscription()) !== null;
+		} catch {
+			// push stays unavailable
+		}
+	}
+
+	// Subscribe this browser to Web Push and register the subscription.
+	async function enablePush() {
+		if (senderId === '' || pushPublicKey === '') return;
+		errorText = '';
+		try {
+			if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+				if ((await Notification.requestPermission()) !== 'granted') return;
+			}
+			const registration = await navigator.serviceWorker.ready;
+			const subscription = await registration.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: urlBase64ToUint8Array(pushPublicKey)
+			});
+			const res = await fetch('/api/push/subscribe', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ personId: senderId, subscription: subscription.toJSON() })
+			});
+			if (res.ok) pushSubscribed = true;
+			else errorText = `Could not enable push (HTTP ${res.status}).`;
+		} catch {
+			errorText = 'Could not enable push notifications.';
+		}
+	}
+
 	// Fire a desktop notification for a genuinely new message from someone
 	// else that arrived while the tab is in the background.
 	function maybeNotify(message: Message) {
@@ -657,6 +716,7 @@
 			// ignore
 		}
 		if (canNotify()) notifyPermission = Notification.permission;
+		initPush();
 		draft = loadDraft(activeSlug);
 		loadPeople();
 		loadConversations();
@@ -678,7 +738,16 @@
 		<div class="titlebar">
 			<h1>Household Hub</h1>
 			<div class="titlebar-actions">
-				{#if canNotify() && notifyPermission === 'default'}
+				{#if pushAvailable && !pushSubscribed}
+					<button
+						type="button"
+						class="theme-toggle"
+						onclick={enablePush}
+						title="Enable background push notifications"
+					>
+						🔔 Enable push
+					</button>
+				{:else if canNotify() && notifyPermission === 'default' && !pushAvailable}
 					<button
 						type="button"
 						class="theme-toggle"

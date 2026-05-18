@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
 import { insertMessage, loadReactions, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
+import { notifyPushSubscribers } from '$lib/server/push';
 import { nowIso } from '$lib/server/time';
 
 // Resolve a conversation row id from its URL slug, or 404.
@@ -118,6 +119,15 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		await fanoutMessage(db, platform!.env, message.id);
 	} catch (e) {
 		console.error('[fanout] failed for message', message.id, e);
+	}
+
+	// Notify subscribed devices over Web Push (M38); a no-op if push is
+	// unconfigured. The message is already stored — a push failure is logged,
+	// not surfaced.
+	try {
+		await notifyPushSubscribers(platform!.env, db, message.author_person_id);
+	} catch (e) {
+		console.error('[push] notify failed for message', message.id, e);
 	}
 
 	// Return the message with its delivery counts — fanout has completed, so

@@ -201,6 +201,10 @@ when each is reached.
 - [ ] **M37 — Pinned messages.** Any household member can pin an important
   message; pinned messages show in a bar at the top of the conversation, and
   the pin state propagates over the SSE stream.
+- [ ] **M38 — Web push notifications.** With a VAPID key pair configured, a
+  household member can subscribe a browser/device to background push; a new
+  message fires a notification even when the app is closed. Gated like the SMS
+  and email adapters — inert until the VAPID environment is set.
 
 ## Surprises & Discoveries
 
@@ -905,6 +909,44 @@ is the real-auth round-trip (pin, unpin, 400 on a non-boolean, 400 on an empty
 body, 404 on an unknown message). No new try/catch wraps the write —
 `setMessagePinned` is one statement and a failure throws to a 500 (no silent
 fallback).
+
+**M38 — Web push notifications.** M28 fires notifications only while the tab
+is open; M38 adds true background push. Migration `0009_push_subscriptions
+.sql` creates a `push_subscriptions` table (one row per browser/device,
+UNIQUE on `endpoint`). `scripts/gen-vapid-keys.mjs` generates the VAPID EC
+P-256 key pair; `src/lib/server/push.ts` signs a VAPID JWT (ES256, Web Crypto)
+and sends a *payload-less* "tickle" push — no RFC 8291 body encryption — and
+`notifyPushSubscribers` pushes to every subscribed device except the message
+author's, pruning any endpoint the push service reports gone. The service
+worker gains `push` (shows a generic notification) and `notificationclick`
+(focuses or opens the app) handlers. Three routes:
+`GET /api/push/public-key` (404 when unconfigured), `POST /api/push/subscribe`,
+`POST /api/push/unsubscribe`. The three message-creation paths (app POST, SMS
+webhook, email webhook) call `notifyPushSubscribers` after fanout.
+`+page.svelte` adds an "Enable push" titlebar control shown when push is
+configured and this browser is not yet subscribed. The whole feature is gated:
+with no VAPID environment every push function is a safe no-op and the
+public-key route 404s, so it ships inert — the same pattern as the SMS and
+email adapters. `scripts/probe-d1.mjs` gains a `push_subscriptions` probe and
+`/api/test/reset` wipes the table.
+
+User-Asset Write-Path Checklist (M38): the touched class is the new
+`push_subscriptions` table. The write path is `upsertPushSubscription` in
+`src/lib/server/db.ts` (with `deletePushSubscriptionByEndpoint` and
+`deletePushSubscription` for removal); the server gate is the `POST` handler
+in `src/routes/api/push/subscribe/+server.ts`, which requires a known
+`personId` and a subscription with an `endpoint` and `p256dh`/`auth` keys. No
+new string set is introduced, so no parity test is needed. The post-deploy
+probe is `push_subscriptions — dangling person_id / blank endpoint` in
+`scripts/probe-d1.mjs`; `e2e/api-push.spec.ts` is the real-auth round-trip
+(public-key 404 when unconfigured, store, idempotent re-subscribe, 400 on a
+missing endpoint, 400 on an unknown person, unsubscribe + idempotent
+unsubscribe, 400 on a missing endpoint). One new try/catch is introduced — the
+per-subscription loop in `notifyPushSubscribers` — and it is the accepted
+"every write attempt is independent" pattern (PLANS.md invariant 2): one
+failed push or expiry-prune must not abort the rest of the loop; it is not a
+silent fallback because the canonical message is already stored and a push is
+a best-effort secondary notification, not a user-asset write.
 
 ## Concrete Steps
 
