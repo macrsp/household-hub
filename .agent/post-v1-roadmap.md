@@ -255,6 +255,10 @@ when each is reached.
 - [ ] **M54 — AI conversation summary.** A "✨ Catch me up" button summarises
   a conversation's recent messages via Cloudflare Workers AI — no external API
   key, gated like the other adapters.
+- [ ] **M55 — In-app @claude assistant.** Mentioning `@claude` in an ordinary
+  conversation gets a short Workers AI reply, posted back as the Claude Code
+  member — distinct from the dev channel, and answering questions not code
+  changes.
 
 ## Surprises & Discoveries
 
@@ -1250,7 +1254,34 @@ the conversation nav and shows the result in a dismissible banner; switching
 conversations clears it. `e2e/api-conversations.spec.ts` covers the endpoint
 responding without crashing (a clean 503 in the auth-less E2E env) and 404 for
 an unknown conversation — and confirms `wrangler pages dev` still starts with
-the AI binding declared.
+the AI binding declared. (Fix: the first M54 push failed CI because the `ai`
+binding made `wrangler pages dev` open a remote proxy session needing Workers
+AI auth; the E2E lane now runs `wrangler pages dev` against a generated config
+with the `ai` binding removed, in a temp directory, sharing D1 state via
+`--persist-to` — the real `wrangler.jsonc` is never modified.)
+
+**M55 — In-app @claude assistant.** When a household member writes `@claude` in
+an ordinary conversation, `src/lib/server/assistant.ts` generates a short reply
+with Cloudflare Workers AI and posts it as the `person-claude` member. It is
+distinct from the `#claude` dev channel (M52/M53), whose requests go to the
+external runner — `maybeAssistantReply` skips the dev channel, skips Claude's
+own posts (no loops), skips non-mentions, and no-ops when Workers AI is unset.
+The POST messages route, after fanout, fires it through
+`platform.context.waitUntil` so the send response is never delayed; the reply
+appears in the conversation a couple of seconds later over the SSE stream.
+`app.d.ts` gains the `context.waitUntil` type. `mentionsClaude` is a pure
+`@claude\b` test, unit-covered in `assistant.test.ts` (5 cases);
+`e2e/api-dev-channel.spec.ts` checks an `@claude` message posts cleanly (the
+assistant is a no-op without Workers AI in the E2E env).
+
+Write-Path note (M55): the assistant writes to `messages` via the existing
+typed `insertMessage` helper, authored as `person-claude`. The whole of
+`maybeAssistantReply` is wrapped in one try/catch — that is not a silent
+fallback of a user-asset write: the household member's own message is already
+durably stored before the assistant runs, and the assistant reply is a
+generated convenience, so logging and dropping a failed reply is the correct
+best-effort behaviour. No new string set; the existing `messages` probes
+cover the rows it inserts.
 
 ## Concrete Steps
 
