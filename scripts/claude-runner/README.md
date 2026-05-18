@@ -54,6 +54,20 @@ On a cron (every 10 minutes), with the env in the crontab or an env file:
 */10 * * * * cd /path/to/household-hub && node scripts/claude-runner/run.mjs >> /var/log/claude-runner.log 2>&1
 ```
 
+## Optional: the daily digest (M63)
+
+The same host can post a daily household digest by hitting the digest-post
+endpoint on a cron. It generates the same summary as the in-app "What's new"
+button and posts it into a conversation (default `general`) as Claude Code.
+
+```cron
+30 7 * * * curl -fsS -X POST "$HOUSEHOLD_HUB_URL/api/digest/post" -H "X-Webhook-Secret: $DIGEST_POST_SECRET" >> /var/log/household-digest.log 2>&1
+```
+
+If the `DIGEST_POST_SECRET` Cloudflare secret is set, the `X-Webhook-Secret`
+header must match it; if it is unset, the header is not required. A quiet day
+posts nothing.
+
 ## Guardrails
 
 - **Cost cap.** `MAX_REQUESTS` (default 1) limits requests per run. Also set a
