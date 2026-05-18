@@ -32,7 +32,21 @@
 	// (see scripts/e2e/start-server.mjs) so it needs no Workers AI auth.
 	"ai": {
 		"binding": "AI"
-	}
+	},
+
+	// Cloudflare Vectorize — message-body embeddings for semantic search
+	// (M66). Reached as event.platform.env.VECTORIZE. The index
+	// `household-hub-messages` (768-dim, cosine) holds one vector per message,
+	// namespaced by conversation id. The E2E lane strips this binding too (see
+	// scripts/e2e/start-server.mjs): with it present, `wrangler pages dev`
+	// would open a remote proxy session needing account auth the CI runner
+	// lacks. With it absent, semantic search reports itself unavailable (503).
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "household-hub-messages"
+		}
+	]
 
 	// TODO(queues): v1 fans messages out synchronously (see
 	// .agent/household-relay-v1.md, Decision Log). When fanout moves async,

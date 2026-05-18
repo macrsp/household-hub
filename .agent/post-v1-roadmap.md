@@ -297,6 +297,11 @@ when each is reached.
 - [x] **M65 — Threaded @claude assistant replies.** The in-app assistant
   (M55) now posts its reply as a threaded reply to the message that mentioned
   it, so the answer renders attached to the question instead of detached.
+- [x] **M66 — Semantic message search.** A "Smart" search toggle matches
+  messages by meaning, not exact words, via Cloudflare Vectorize: each message
+  is embedded with Workers AI on send and stored in the `household-hub-messages`
+  index under a per-conversation namespace; a search embeds the query and
+  retrieves the nearest vectors. Gated like the other AI features.
 
 ## Surprises & Discoveries
 
@@ -1458,6 +1463,40 @@ conversation, so it satisfies the same-conversation invariant the messages POST
 route enforces for user-supplied reply targets. Still authored as
 `person-claude` through the existing `insertMessage`/`fanoutMessage` path — the
 M55 Write-Path note still holds, no new write path.
+
+**M66 — Semantic message search.** The first feature to use Cloudflare
+Vectorize. The `household-hub-messages` index (768-dim, cosine) was created via
+the Vectorize v2 REST API — wrangler's `vectorize` subcommands cannot run with
+this account's Account API Token, as they call the user-level `/memberships`
+endpoint an account-scoped token structurally cannot reach; the account REST
+API can. `wrangler.jsonc` gains the `vectorize` binding; `app.d.ts` types it as
+`VECTORIZE?: VectorizeIndex`. `src/lib/server/embeddings.ts` wraps the
+`@cf/baai/bge-base-en-v1.5` embedding model (batched at 100 texts/call);
+`src/lib/server/semantic-index.ts` embeds a message body and upserts it to
+Vectorize keyed by message id, under a namespace of the conversation id, so a
+search can be scoped to one thread (namespace) or run household-wide (no
+namespace). `GET /api/search/semantic?q=&slug=?` embeds the query, retrieves
+the top 20 nearest vectors above a 0.4 cosine floor, and fetches those rows
+from D1 — a message deleted since it was indexed simply does not return, so the
+canonical store filters stale vectors without index pruning. `POST
+/api/search/reindex` backfills the index from the most recent 500 messages
+(idempotent, vectors keyed by id). The search box gains a "Smart" toggle
+alongside "All"; semantic results render through the existing
+cross-conversation result list. Both `embeddings.ts` and `semantic-index.ts`
+are unit-covered with stub AI/Vectorize objects (batching, blank-body skip,
+no-binding no-op). The E2E lane strips the `vectorize` binding the same way it
+strips `ai` (`scripts/e2e/start-server.mjs`), so semantic search reports itself
+unavailable (503) in CI. Edited messages keep a stale vector for now —
+`TODO:` re-index on edit; deleted messages need no pruning (filtered at query).
+
+Write-Path note (M66): the messages POST route gains a best-effort
+`indexMessage` side-effect, fired through `waitUntil` after the response. This
+is not a user-asset write — the Vectorize entry is a derived search-index
+artifact, not a canonical record. The canonical message is durably stored by
+`insertMessage` before indexing runs; an indexing failure is logged and
+dropped, and the index can be rebuilt at any time from `messages` via the
+reindex route. The `messages` write path is unchanged in what it durably
+stores; no new user-asset record class, no new string set.
 
 ## Concrete Steps
 
