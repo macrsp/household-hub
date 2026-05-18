@@ -205,6 +205,9 @@ when each is reached.
   household member can subscribe a browser/device to background push; a new
   message fires a notification even when the app is closed. Gated like the SMS
   and email adapters — inert until the VAPID environment is set.
+- [ ] **M39 — Branded support address.** The customer-support contact on
+  `/sms-terms`, `/privacy`, and the A2P campaign doc moves from a Gmail
+  address to `help@practicepartner.app`, on the registered brand's domain.
 
 ## Surprises & Discoveries
 
@@ -947,6 +950,16 @@ per-subscription loop in `notifyPushSubscribers` — and it is the accepted
 failed push or expiry-prune must not abort the rest of the loop; it is not a
 silent fallback because the canonical message is already stored and a push is
 a best-effort secondary notification, not a user-asset write.
+
+**M39 — Branded support address.** Presentation only — no API, database, or
+write path is touched, so no Write-Path Checklist. The customer-support
+contact shown on `/sms-terms` (the HELP and Contact sections), `/privacy` (the
+Contact section), and recorded in `.agent/a2p-campaign.md` (the HELP message)
+moves from `north0401@gmail.com` to `help@practicepartner.app` — an address on
+the registered brand's own domain. A2P reviewers visit the linked terms and
+privacy pages during vetting, and a branded-domain support address reads as
+more consistent with the brand than a Gmail address. Matt's household email
+endpoint in `seed.sql` is a different use of the address and is left unchanged.
 
 ## Concrete Steps
 
