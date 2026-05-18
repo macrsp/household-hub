@@ -103,4 +103,21 @@ test.describe('conversations API', () => {
 		expect(text).toContain('#general');
 		expect(text).toContain('exported line one');
 	});
+
+	test('exports a conversation as a JSON download (M49)', async ({ request }) => {
+		await postMessage(request, { body: 'json export line' });
+
+		const res = await request.get('/api/conversations/general/export?format=json');
+		expect(res.ok()).toBeTruthy();
+		expect(res.headers()['content-type']).toContain('application/json');
+		expect(res.headers()['content-disposition']).toContain('.json');
+
+		const payload = await res.json();
+		expect(payload.conversation.slug).toBe('general');
+		expect(payload.message_count).toBe(payload.messages.length);
+		const msg = payload.messages.find((m: { body: string }) => m.body === 'json export line');
+		expect(msg).toBeTruthy();
+		expect(msg.deleted).toBe(false);
+		expect(msg.author).toBeTruthy();
+	});
 });

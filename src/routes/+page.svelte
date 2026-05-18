@@ -1011,7 +1011,14 @@
 					{activeConversation.archived_at ? 'Unarchive' : 'Archive'}
 				</button>
 				<a class="manage-export" href="/api/conversations/{activeSlug}/export" download>
-					Export
+					Export text
+				</a>
+				<a
+					class="manage-export"
+					href="/api/conversations/{activeSlug}/export?format=json"
+					download
+				>
+					Export JSON
 				</a>
 				<button type="button" onclick={closeManage}>Done</button>
 			</form>
