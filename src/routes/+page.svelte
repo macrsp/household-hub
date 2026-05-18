@@ -91,6 +91,10 @@
 	let globalSearchMode = $state(false);
 	let globalResults = $state<GlobalResult[]>([]);
 	let globalLastSearch = $state('');
+	// AI "catch me up" summary of the active conversation (M54).
+	let summaryText = $state('');
+	let summaryError = $state('');
+	let summaryLoading = $state(false);
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Member ids selected for a new conversation (M47) — defaults to everyone.
@@ -305,6 +309,7 @@
 		errorText = '';
 		noMoreOlder = false;
 		clearSearch();
+		dismissSummary();
 		atBottom = true;
 		openStream();
 		loadPrefs();
@@ -382,6 +387,33 @@
 		globalSearchMode = false;
 		globalResults = [];
 		globalLastSearch = '';
+	}
+
+	// AI summary (M54): fetch a "catch me up" summary of the active thread.
+	async function loadSummary() {
+		summaryText = '';
+		summaryError = '';
+		summaryLoading = true;
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/summary`);
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; summary?: string }
+				| null;
+			if (res.ok && data?.available && data.summary) {
+				summaryText = data.summary;
+			} else {
+				summaryError = 'A summary isn’t available right now.';
+			}
+		} catch {
+			summaryError = 'Could not load a summary — network error.';
+		} finally {
+			summaryLoading = false;
+		}
+	}
+
+	function dismissSummary() {
+		summaryText = '';
+		summaryError = '';
 	}
 
 	// Jump to the conversation a global search result belongs to.
@@ -965,6 +997,14 @@
 				<button type="button" class="conv-tab conv-manage" onclick={openManage}>
 					Manage
 				</button>
+				<button
+					type="button"
+					class="conv-tab conv-summary"
+					onclick={loadSummary}
+					disabled={summaryLoading}
+				>
+					{summaryLoading ? 'Summarizing…' : '✨ Catch me up'}
+				</button>
 			{/if}
 			{#if archivedConversations.length > 0}
 				<button
@@ -1085,6 +1125,20 @@
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite" onscroll={updateAtBottom}>
+		{#if summaryText || summaryError}
+			<div class="summary-bar">
+				<span class="summary-icon" aria-hidden="true">✨</span>
+				<span class="summary-text">{summaryError || summaryText}</span>
+				<button
+					type="button"
+					class="summary-dismiss"
+					onclick={dismissSummary}
+					aria-label="Dismiss summary"
+				>
+					✕
+				</button>
+			</div>
+		{/if}
 		{#if globalSearchMode}
 			<p class="search-banner">
 				{globalResults.length} result{globalResults.length === 1 ? '' : 's'} across all
@@ -1428,9 +1482,15 @@
 	}
 
 	.conv-manage,
-	.conv-archived-toggle {
+	.conv-archived-toggle,
+	.conv-summary {
 		font-size: 0.72rem;
 		color: var(--dim);
+	}
+
+	.conv-summary:disabled {
+		cursor: default;
+		color: var(--faint);
 	}
 
 	.conv-archived {
@@ -1754,6 +1814,38 @@
 		background: var(--raised);
 		border: 1px solid var(--border);
 		border-radius: 0.5rem;
+	}
+
+	.summary-bar {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		padding: 0.6rem 0.7rem;
+		margin-bottom: 0.5rem;
+		background: var(--raised);
+		border: 1px solid var(--accent);
+		border-radius: 0.5rem;
+		font-size: 0.85rem;
+	}
+
+	.summary-icon {
+		flex: none;
+	}
+
+	.summary-text {
+		flex: 1;
+		min-width: 0;
+		color: var(--muted);
+		white-space: pre-wrap;
+	}
+
+	.summary-dismiss {
+		flex: none;
+		border: none;
+		background: none;
+		color: var(--dim);
+		font-size: 0.8rem;
+		cursor: pointer;
 	}
 
 	.pinned-row {

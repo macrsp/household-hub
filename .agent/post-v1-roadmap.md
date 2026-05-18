@@ -252,6 +252,9 @@ when each is reached.
   `#claude` for new requests, runs Claude Code headless on each, and posts the
   result back into the channel. It runs on a cron on a host the operator
   controls (household-hub itself cannot run Claude Code).
+- [ ] **M54 — AI conversation summary.** A "✨ Catch me up" button summarises
+  a conversation's recent messages via Cloudflare Workers AI — no external API
+  key, gated like the other adapters.
 
 ## Surprises & Discoveries
 
@@ -1233,6 +1236,21 @@ retried forever. `scripts/claude-runner/README.md` documents the host
 prerequisites (`claude` CLI, a repo clone with push access, `gh`), the
 environment, and a cron line. The operator supplies the host, an
 `ANTHROPIC_API_KEY`, and the cron entry.
+
+**M54 — AI conversation summary.** A read-only feature — no write path, so no
+Write-Path Checklist. `wrangler.jsonc` gains a Cloudflare Workers AI binding
+(`ai` → `AI`); `app.d.ts` types it as an optional `Ai`. A new route
+`GET /api/conversations/[slug]/summary` takes the conversation's most recent
+~40 non-deleted messages, builds a transcript, and asks the
+`@cf/meta/llama-3.1-8b-instruct` model for a 2–4 sentence catch-up. It is
+gated like the SMS/email adapters: with no `AI` binding, or if the model call
+throws (local/CI have no Workers AI auth), it returns `503 { available:
+false }` instead of erroring. `+page.svelte` adds a "✨ Catch me up" button to
+the conversation nav and shows the result in a dismissible banner; switching
+conversations clears it. `e2e/api-conversations.spec.ts` covers the endpoint
+responding without crashing (a clean 503 in the auth-less E2E env) and 404 for
+an unknown conversation — and confirms `wrangler pages dev` still starts with
+the AI binding declared.
 
 ## Concrete Steps
 
