@@ -39,6 +39,8 @@
 		reactions?: Array<{ emoji: string; count: number; people: string[] }>;
 		// Pinning (M37): set while the message is pinned to the conversation.
 		pinned_at?: string | null;
+		// Replies (M42): the id of the message this one replies to, or null.
+		reply_to_message_id?: string | null;
 	}
 	interface Prefs {
 		muted: boolean;
@@ -79,6 +81,8 @@
 	// and the working copy of its text.
 	// Reactions (M36): the id of the message whose emoji picker is open, or ''.
 	let reactionPickerFor = $state('');
+	// Replies (M42): the id of the message the composer is replying to, or ''.
+	let replyingTo = $state('');
 	let editingId = $state('');
 	let editDraft = $state('');
 	// Per-conversation last-viewed timestamps (slug -> ISO), mirrored from
@@ -547,7 +551,11 @@
 			const res = await fetch(`/api/conversations/${activeSlug}/messages`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ authorPersonId: senderId, body })
+				body: JSON.stringify({
+					authorPersonId: senderId,
+					body,
+					replyToMessageId: replyingTo || undefined
+				})
 			});
 			if (!res.ok) {
 				errorText = `Could not send (HTTP ${res.status}).`;
@@ -560,6 +568,7 @@
 			addMessage({ ...created, author_name: senderName });
 			draft = '';
 			saveDraft(activeSlug);
+			replyingTo = '';
 		} catch {
 			errorText = 'Could not send — network error.';
 		} finally {
@@ -671,6 +680,20 @@
 
 	function toggleReactionPicker(messageId: string) {
 		reactionPickerFor = reactionPickerFor === messageId ? '' : messageId;
+	}
+
+	// Replies (M42): look up a message by id (for rendering a reply's quoted
+	// reference), and start/cancel composing a reply.
+	function messageById(id: string): Message | undefined {
+		return messages.find((m) => m.id === id);
+	}
+
+	function startReply(message: Message) {
+		replyingTo = message.id;
+	}
+
+	function cancelReply() {
+		replyingTo = '';
 	}
 
 	// Pinning (M37): pin or unpin a message. Optimistic; the SSE stream
@@ -946,6 +969,18 @@
 							</div>
 						</form>
 					{:else}
+						{#if message.reply_to_message_id}
+							{@const target = messageById(message.reply_to_message_id)}
+							<p class="reply-ref">
+								↩
+								{#if target}
+									<strong>{target.author_name}:</strong>
+									{target.deleted_at ? 'deleted message' : target.body.slice(0, 70)}
+								{:else}
+									in reply to an earlier message
+								{/if}
+							</p>
+						{/if}
 						<p class="body">{#each linkify(message.body) as seg}{#if seg.link}<a href={seg.href} target="_blank" rel="noopener noreferrer">{seg.value}</a>{:else}{seg.value}{/if}{/each}</p>
 						{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
 							<p class="receipt">
@@ -989,6 +1024,9 @@
 							{/if}
 						</div>
 						<div class="msg-actions">
+							<button type="button" class="action-btn" onclick={() => startReply(message)}>
+								Reply
+							</button>
 							<button
 								type="button"
 								class="action-btn"
@@ -1033,6 +1071,24 @@
 					<option value={pref}>{PREF_LABEL[pref] ?? pref}</option>
 				{/each}
 			</select>
+		</div>
+	{/if}
+
+	{#if replyingTo}
+		{@const replyTarget = messageById(replyingTo)}
+		<div class="reply-banner">
+			<span class="reply-banner-text">
+				↩ Replying to
+				{#if replyTarget}
+					<strong>{replyTarget.author_name}:</strong>
+					{replyTarget.deleted_at ? 'deleted message' : replyTarget.body.slice(0, 60)}
+				{:else}
+					a message
+				{/if}
+			</span>
+			<button type="button" class="reply-cancel" onclick={cancelReply} aria-label="Cancel reply">
+				✕
+			</button>
 		</div>
 	{/if}
 
@@ -1449,6 +1505,45 @@
 
 	.pinned-flag {
 		font-size: 0.7rem;
+	}
+
+	.reply-ref {
+		margin: 0 0 0.15rem;
+		padding-left: 0.4rem;
+		border-left: 2px solid var(--border-strong);
+		font-size: 0.72rem;
+		color: var(--dim);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.reply-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.4rem 1.25rem;
+		background: var(--raised);
+		border-top: 1px solid var(--border);
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+
+	.reply-banner-text {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.reply-cancel {
+		flex: none;
+		border: none;
+		background: none;
+		color: var(--dim);
+		font-size: 0.85rem;
+		cursor: pointer;
 	}
 
 	.edit-form {
