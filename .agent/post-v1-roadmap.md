@@ -227,6 +227,9 @@ when each is reached.
   cross-conversation results list, each row jumping to its thread.
 - [ ] **M46 — @mentions.** An `@name` referring to a household member renders
   highlighted in the message body.
+- [ ] **M47 — Conversation creation with a member picker.** The new-conversation
+  form can choose which household members join, rather than always adding
+  everyone; `POST /api/conversations` accepts an optional `personIds`.
 
 ## Surprises & Discoveries
 
@@ -1107,6 +1110,26 @@ member. An `@word` matching no member stays plain text. `+page.svelte` derives
 `parseBody` — a `mention` segment becomes a highlighted `<span>`; as before,
 every segment is bound as text/attribute, never `{@html}`, so a body cannot
 inject markup. `message-format.test.ts` adds six `parseBody` cases.
+
+**M47 — Conversation creation with a member picker.** M18 created a
+conversation with every member; M43 let you trim it afterward. M47 lets the
+membership be chosen up front. `POST /api/conversations` accepts an optional
+`personIds: string[]`: when given, only those members join (each validated as
+a known person, 400 otherwise); omitted, every member joins as before. The
+new-conversation form in `+page.svelte` gains a member checklist, defaulting to
+everyone selected when the form opens. The write path is the existing
+`createConversationWithParticipants` helper (one atomic `db.batch()`).
+
+User-Asset Write-Path Checklist (M47): the touched classes are `conversations`
+and `participants`, through the unchanged atomic helper
+`createConversationWithParticipants` in `db.ts`. The change is to the gate —
+the `POST /api/conversations` handler — which now also validates an optional
+`personIds` array: every entry must be a known person id (400 otherwise), so a
+conversation can never be created with a participant row for a non-existent
+person. No new string set, so no parity test. The existing `conversations` and
+`participants` post-deploy probes still apply; `e2e/api-conversations.spec.ts`
+gains two cases (create with a chosen subset; 400 on an unknown personId). No
+new try/catch — the helper remains a single `db.batch()`.
 
 ## Concrete Steps
 

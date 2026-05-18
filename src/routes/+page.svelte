@@ -93,6 +93,8 @@
 	let globalLastSearch = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
+	// Member ids selected for a new conversation (M47) — defaults to everyone.
+	let newConvMembers = $state<Set<string>>(new Set());
 	// Conversation management (M27): the manage panel for the active thread,
 	// the working copy of its name, and whether archived threads are revealed.
 	let managingConversation = $state(false);
@@ -391,7 +393,7 @@
 			const res = await fetch('/api/conversations', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ name, slug })
+				body: JSON.stringify({ name, slug, personIds: [...newConvMembers] })
 			});
 			if (!res.ok) {
 				errorText =
@@ -907,7 +909,10 @@
 				type="button"
 				class="conv-tab conv-new"
 				title="New conversation"
-				onclick={() => (creatingConversation = true)}
+				onclick={() => {
+					creatingConversation = true;
+					newConvMembers = new Set(people.map((p) => p.id));
+				}}
 			>
 				+
 			</button>
@@ -948,6 +953,24 @@
 						newConvName = '';
 					}}>Cancel</button
 				>
+				<div class="new-conv-members">
+					<span class="new-conv-members-label">Members:</span>
+					{#each people as person (person.id)}
+						<label class="member-toggle">
+							<input
+								type="checkbox"
+								checked={newConvMembers.has(person.id)}
+								onchange={(e) => {
+									const next = new Set(newConvMembers);
+									if (e.currentTarget.checked) next.add(person.id);
+									else next.delete(person.id);
+									newConvMembers = next;
+								}}
+							/>
+							{person.display_name}
+						</label>
+					{/each}
+				</div>
 			</form>
 		{/if}
 		{#if managingConversation && activeConversation}
@@ -1386,7 +1409,8 @@
 		flex-wrap: wrap;
 	}
 
-	.manage-members {
+	.manage-members,
+	.new-conv-members {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -1395,7 +1419,8 @@
 		font-size: 0.82rem;
 	}
 
-	.manage-members-label {
+	.manage-members-label,
+	.new-conv-members-label {
 		font-weight: 600;
 		width: 100%;
 	}
