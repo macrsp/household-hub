@@ -120,6 +120,10 @@
 	// AI conversation auto-title (M59): suggesting a name in the Manage panel.
 	let titleSuggesting = $state(false);
 	let titleError = $state('');
+	// The "✨ AI" header menu (M67) — folds the per-conversation AI actions
+	// (catch me up, to-dos, suggest a reply, ask) into one dropdown.
+	let aiMenuOpen = $state(false);
+	let aiMenuWrap = $state<HTMLElement>();
 	// AI "ask this conversation" Q&A (M62).
 	let askOpen = $state(false);
 	let askQuestion = $state('');
@@ -1135,16 +1139,27 @@
 	// manage-conversation panels, then a search result view.
 	function onGlobalKeydown(event: KeyboardEvent) {
 		if (event.key !== 'Escape') return;
-		if (reactionPickerFor !== '') reactionPickerFor = '';
+		if (aiMenuOpen) aiMenuOpen = false;
+		else if (reactionPickerFor !== '') reactionPickerFor = '';
 		else if (editingId !== '') cancelEdit();
 		else if (replyingTo !== '') cancelReply();
 		else if (creatingConversation) {
 			creatingConversation = false;
 			newConvName = '';
 		} else if (managingConversation) closeManage();
+		else if (askOpen) dismissAsk();
 		else if (searchMode || globalSearchMode) clearSearch();
 		else return;
 		event.preventDefault();
+	}
+
+	// Close the "✨ AI" menu (M67) when a click lands outside its wrapper.
+	function onWindowClick(event: MouseEvent) {
+		if (!aiMenuOpen) return;
+		if (aiMenuWrap && event.target instanceof Node && aiMenuWrap.contains(event.target)) {
+			return;
+		}
+		aiMenuOpen = false;
 	}
 
 	function formatTime(iso: string): string {
@@ -1189,7 +1204,7 @@
 	<title>{unseenCount > 0 ? `(${unseenCount}) Household Hub` : 'Household Hub'}</title>
 </svelte:head>
 
-<svelte:window onkeydown={onGlobalKeydown} />
+<svelte:window onkeydown={onGlobalKeydown} onclick={onWindowClick} />
 
 <main>
 	<header>
@@ -1263,33 +1278,69 @@
 				<button type="button" class="conv-tab conv-manage" onclick={openManage}>
 					Manage
 				</button>
-				<button
-					type="button"
-					class="conv-tab conv-summary"
-					onclick={loadSummary}
-					disabled={summaryLoading}
-				>
-					{summaryLoading ? 'Summarizing…' : '✨ Catch me up'}
-				</button>
-				<button
-					type="button"
-					class="conv-tab conv-summary"
-					onclick={loadActions}
-					disabled={actionsLoading}
-				>
-					{actionsLoading ? 'Finding to-dos…' : '✅ To-dos'}
-				</button>
-				<button
-					type="button"
-					class="conv-tab conv-summary"
-					onclick={loadSuggestions}
-					disabled={suggestionsLoading}
-				>
-					{suggestionsLoading ? 'Thinking…' : '💬 Suggest a reply'}
-				</button>
-				<button type="button" class="conv-tab conv-summary" onclick={toggleAsk}>
-					{askOpen ? '❓ Close' : '❓ Ask'}
-				</button>
+				<div class="ai-menu-wrap" bind:this={aiMenuWrap}>
+					<button
+						type="button"
+						class="conv-tab conv-summary"
+						class:active={aiMenuOpen}
+						onclick={() => (aiMenuOpen = !aiMenuOpen)}
+						aria-haspopup="menu"
+						aria-expanded={aiMenuOpen}
+					>
+						✨ AI
+					</button>
+					{#if aiMenuOpen}
+						<div class="ai-menu" role="menu">
+							<button
+								type="button"
+								role="menuitem"
+								class="ai-menu-item"
+								disabled={summaryLoading}
+								onclick={() => {
+									aiMenuOpen = false;
+									loadSummary();
+								}}
+							>
+								{summaryLoading ? 'Summarizing…' : '✨ Catch me up'}
+							</button>
+							<button
+								type="button"
+								role="menuitem"
+								class="ai-menu-item"
+								disabled={actionsLoading}
+								onclick={() => {
+									aiMenuOpen = false;
+									loadActions();
+								}}
+							>
+								{actionsLoading ? 'Finding to-dos…' : '✅ To-dos'}
+							</button>
+							<button
+								type="button"
+								role="menuitem"
+								class="ai-menu-item"
+								disabled={suggestionsLoading}
+								onclick={() => {
+									aiMenuOpen = false;
+									loadSuggestions();
+								}}
+							>
+								{suggestionsLoading ? 'Thinking…' : '💬 Suggest a reply'}
+							</button>
+							<button
+								type="button"
+								role="menuitem"
+								class="ai-menu-item"
+								onclick={() => {
+									aiMenuOpen = false;
+									if (!askOpen) toggleAsk();
+								}}
+							>
+								❓ Ask a question
+							</button>
+						</div>
+					{/if}
+				</div>
 			{/if}
 			{#if archivedConversations.length > 0}
 				<button
@@ -1439,6 +1490,7 @@
 				<button type="submit" disabled={askLoading || askQuestion.trim() === ''}>
 					{askLoading ? 'Asking…' : 'Ask'}
 				</button>
+				<button type="button" onclick={dismissAsk} aria-label="Close ask">✕</button>
 			</form>
 		{/if}
 	</header>
@@ -1945,6 +1997,47 @@
 	.conv-summary:disabled {
 		cursor: default;
 		color: var(--faint);
+	}
+
+	.ai-menu-wrap {
+		position: relative;
+		display: inline-block;
+	}
+
+	.ai-menu {
+		position: absolute;
+		top: calc(100% + 0.3rem);
+		left: 0;
+		z-index: 20;
+		display: flex;
+		flex-direction: column;
+		min-width: 12rem;
+		padding: 0.3rem;
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: 0.5rem;
+		box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+	}
+
+	.ai-menu-item {
+		font: inherit;
+		font-size: 0.8rem;
+		text-align: left;
+		padding: 0.4rem 0.5rem;
+		border: none;
+		border-radius: 0.35rem;
+		background: none;
+		color: var(--text);
+		cursor: pointer;
+	}
+
+	.ai-menu-item:hover {
+		background: var(--raised);
+	}
+
+	.ai-menu-item:disabled {
+		color: var(--faint);
+		cursor: default;
 	}
 
 	.conv-archived {

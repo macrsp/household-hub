@@ -302,6 +302,10 @@ when each is reached.
   is embedded with Workers AI on send and stored in the `household-hub-messages`
   index under a per-conversation namespace; a search embeds the query and
   retrieves the nearest vectors. Gated like the other AI features.
+- [x] **M67 — The ✨ AI menu.** The four per-conversation AI actions (catch me
+  up, to-dos, suggest a reply, ask) fold from separate header buttons into one
+  "✨ AI" dropdown menu, keeping the conversation header uncluttered as the AI
+  feature set grows.
 
 ## Surprises & Discoveries
 
@@ -1497,6 +1501,18 @@ artifact, not a canonical record. The canonical message is durably stored by
 dropped, and the index can be rebuilt at any time from `messages` via the
 reindex route. The `messages` write path is unchanged in what it durably
 stores; no new user-asset record class, no new string set.
+
+**M67 — The ✨ AI menu.** A pure-UI consolidation. As the AI feature set grew
+(M54, M56, M57, M62) the conversation header accumulated four separate buttons.
+They now fold into one "✨ AI" dropdown: a `aiMenuOpen`-toggled `.ai-menu` with
+four `role="menuitem"` entries that each run their action and close the menu.
+The menu closes on Escape (added to the M48 Escape chain, most-transient first)
+and on an outside click — a `<svelte:window onclick>` handler that no-ops when
+the click lands inside the menu wrapper, found via a `bind:this` element ref.
+The Ask panel previously relied on the old toggle button to close; it now
+carries its own ✕ and is in the Escape chain. No API or write-path change —
+`e2e/ui-smoke.spec.ts` covers the menu opening, listing the four actions, and
+closing on Escape.
 
 ## Concrete Steps
 

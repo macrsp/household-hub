@@ -45,6 +45,27 @@ test.describe('conversation UI', () => {
 		await expect(nameField).toBeHidden();
 	});
 
+	test('the ✨ AI menu opens, lists the AI actions, and Escape closes it (M67)', async ({
+		page,
+		request
+	}) => {
+		await resetDatabase(request);
+		await page.goto('/');
+
+		const aiButton = page.getByRole('button', { name: '✨ AI' });
+		await expect(aiButton).toBeVisible();
+		await aiButton.click();
+
+		// All four per-conversation AI actions live in the one menu now.
+		await expect(page.getByRole('menuitem', { name: /Catch me up/ })).toBeVisible();
+		await expect(page.getByRole('menuitem', { name: /To-dos/ })).toBeVisible();
+		await expect(page.getByRole('menuitem', { name: /Suggest a reply/ })).toBeVisible();
+		await expect(page.getByRole('menuitem', { name: /Ask a question/ })).toBeVisible();
+
+		await page.keyboard.press('Escape');
+		await expect(page.getByRole('menuitem', { name: /Catch me up/ })).toBeHidden();
+	});
+
 	test('loads the privacy policy page', async ({ page }) => {
 		await page.goto('/privacy');
 		await expect(
