@@ -27,7 +27,9 @@
 
 	// Cloudflare Workers AI — reached as event.platform.env.AI. Powers the
 	// conversation-summary feature (M54). No API key: Workers AI runs on
-	// Cloudflare and is billed through the account.
+	// Cloudflare and is billed through the account. The E2E lane runs
+	// `wrangler pages dev` from a generated config with this binding removed
+	// (see scripts/e2e/start-server.mjs) so it needs no Workers AI auth.
 	"ai": {
 		"binding": "AI"
 	}

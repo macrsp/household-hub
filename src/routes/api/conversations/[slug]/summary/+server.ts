@@ -15,16 +15,18 @@ const SUMMARY_WINDOW = 40;
 // erroring — the UI then simply reports the summary is unavailable.
 export const GET: RequestHandler = async ({ platform, params }) => {
 	const db = requireDb(platform);
-	const ai = platform?.env.AI;
-	if (!ai) {
-		return json({ available: false, summary: '' }, { status: 503 });
-	}
 
+	// An unknown conversation is a 404 regardless of whether AI is configured.
 	const conversation = await db
 		.prepare('SELECT id, name FROM conversations WHERE slug = ?')
 		.bind(params.slug)
 		.first<{ id: string; name: string }>();
 	if (!conversation) throw error(404, `Unknown conversation: ${params.slug}`);
+
+	const ai = platform?.env.AI;
+	if (!ai) {
+		return json({ available: false, summary: '' }, { status: 503 });
+	}
 
 	// The most recent readable messages, oldest-first for the model.
 	const { results } = await db
