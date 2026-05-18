@@ -53,6 +53,15 @@
 		muted: boolean;
 		delivery_preference: string;
 	}
+	// A hit from the cross-conversation search (M45).
+	interface GlobalResult {
+		id: string;
+		body: string;
+		created_at: string;
+		author_name: string;
+		conversation_slug: string;
+		conversation_name: string;
+	}
 
 	// Friendly labels for the delivery-preference values (the values
 	// themselves come from $lib/preferences — the single source of truth).
@@ -76,6 +85,12 @@
 	let searchMode = $state(false);
 	let searchResults = $state<Message[]>([]);
 	let lastSearch = $state('');
+	// Cross-conversation search (M45): when `globalSearch` is on, runSearch
+	// queries every conversation and shows a dedicated results list.
+	let globalSearch = $state(false);
+	let globalSearchMode = $state(false);
+	let globalResults = $state<GlobalResult[]>([]);
+	let globalLastSearch = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Conversation management (M27): the manage panel for the active thread,
@@ -320,13 +335,23 @@
 			return;
 		}
 		try {
-			const res = await fetch(
-				`/api/conversations/${activeSlug}/messages?q=${encodeURIComponent(q)}`
-			);
-			if (!res.ok) return;
-			searchResults = await res.json();
-			lastSearch = q;
-			searchMode = true;
+			if (globalSearch) {
+				const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+				if (!res.ok) return;
+				globalResults = await res.json();
+				globalLastSearch = q;
+				globalSearchMode = true;
+				searchMode = false;
+			} else {
+				const res = await fetch(
+					`/api/conversations/${activeSlug}/messages?q=${encodeURIComponent(q)}`
+				);
+				if (!res.ok) return;
+				searchResults = await res.json();
+				lastSearch = q;
+				searchMode = true;
+				globalSearchMode = false;
+			}
 		} catch {
 			// transient
 		}
@@ -337,6 +362,15 @@
 		searchResults = [];
 		searchInput = '';
 		lastSearch = '';
+		globalSearchMode = false;
+		globalResults = [];
+		globalLastSearch = '';
+	}
+
+	// Jump to the conversation a global search result belongs to.
+	function openGlobalResult(slug: string) {
+		clearSearch();
+		selectConversation(slug);
 	}
 
 	// Create a new conversation: derive a slug from the name, POST it, switch.
@@ -958,14 +992,44 @@
 				runSearch();
 			}}
 		>
-			<input type="search" placeholder="Search #{activeSlug}…" bind:value={searchInput} />
-			{#if searchMode}
+			<input
+				type="search"
+				placeholder={globalSearch ? 'Search all conversations…' : `Search #${activeSlug}…`}
+				bind:value={searchInput}
+			/>
+			<label class="search-all" title="Search every conversation">
+				<input type="checkbox" bind:checked={globalSearch} />
+				All
+			</label>
+			{#if searchMode || globalSearchMode}
 				<button type="button" onclick={clearSearch}>Clear</button>
 			{/if}
 		</form>
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite" onscroll={updateAtBottom}>
+		{#if globalSearchMode}
+			<p class="search-banner">
+				{globalResults.length} result{globalResults.length === 1 ? '' : 's'} across all
+				conversations for “{globalLastSearch}”
+			</p>
+			{#each globalResults as r (r.id)}
+				<button
+					type="button"
+					class="global-result"
+					onclick={() => openGlobalResult(r.conversation_slug)}
+				>
+					<span class="global-result-conv">#{r.conversation_slug}</span>
+					<span class="global-result-body">
+						<strong>{r.author_name}:</strong>
+						{r.body}
+					</span>
+					<span class="global-result-time">{relativeTime(r.created_at, nowTick)}</span>
+				</button>
+			{:else}
+				<p class="empty">No messages match across any conversation.</p>
+			{/each}
+		{:else}
 		{#if !searchMode && pinnedMessages.length > 0}
 			<div class="pinned-bar">
 				{#each pinnedMessages as p (p.id)}
@@ -1118,6 +1182,7 @@
 		{/if}
 		{#if !atBottom && !searchMode && shown.length > 0}
 			<button type="button" class="jump-latest" onclick={scrollToLatest}>↓ Latest</button>
+		{/if}
 		{/if}
 	</section>
 
@@ -1370,7 +1435,7 @@
 		margin-top: 0.5rem;
 	}
 
-	.search input {
+	.search input[type='search'] {
 		flex: 1;
 		min-width: 0;
 		font-size: 0.85rem;
@@ -1383,11 +1448,57 @@
 		cursor: pointer;
 	}
 
+	.search-all {
+		display: flex;
+		align-items: center;
+		gap: 0.2rem;
+		font-size: 0.8rem;
+		color: var(--muted);
+		flex: none;
+	}
+
 	.search-banner {
 		align-self: center;
 		font-size: 0.78rem;
 		color: var(--dim);
 		margin: 0 0 0.5rem;
+	}
+
+	.global-result {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		width: 100%;
+		text-align: left;
+		font: inherit;
+		padding: 0.5rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 0.5rem;
+		background: var(--raised);
+		color: var(--text);
+		cursor: pointer;
+	}
+
+	.global-result-conv {
+		flex: none;
+		font-size: 0.72rem;
+		color: var(--accent);
+		font-weight: 600;
+	}
+
+	.global-result-body {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 0.85rem;
+	}
+
+	.global-result-time {
+		flex: none;
+		font-size: 0.7rem;
+		color: var(--faint);
 	}
 
 	.messages {

@@ -222,6 +222,9 @@ when each is reached.
 - [ ] **M44 — Relative timestamps.** Each message shows a short relative time
   ('now', '5m', '3h', '2d') that refreshes once a minute; the absolute time
   remains on hover.
+- [ ] **M45 — Global search.** `GET /api/search?q=` searches message bodies
+  across every conversation; an "All" toggle by the search box shows a
+  cross-conversation results list, each row jumping to its thread.
 
 ## Surprises & Discoveries
 
@@ -1079,6 +1082,18 @@ testable, and `message-format.test.ts` adds six cases. `+page.svelte` shows
 `relativeTime` in each message's meta row with the absolute time kept as the
 `title` tooltip, and a once-a-minute `nowTick` interval keeps the labels
 fresh.
+
+**M45 — Global search.** A read-only feature — no write path, so no Write-Path
+Checklist. The per-conversation search (M16) only covers the active thread; M45
+adds a household-wide one. New route `GET /api/search?q=<term>` joins
+`messages`, `people`, and `conversations`, excludes soft-deleted messages, and
+returns up to 100 matches each carrying its conversation slug and name. `400`
+when `?q=` is missing. `+page.svelte` adds an "All" checkbox beside the search
+box; with it on, `runSearch` queries `/api/search` and the message area is
+replaced by a dedicated results list — each row shows the conversation, author,
+body, and relative time, and clicking it jumps to that thread. `e2e/api-search
+.spec.ts` covers cross-conversation matches, soft-deleted exclusion, the
+missing-term 400, and an empty result.
 
 ## Concrete Steps
 
