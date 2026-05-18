@@ -263,6 +263,10 @@ when each is reached.
   items — things someone agreed to or was asked to do — from a conversation's
   recent messages via Workers AI, with an optional `[Name]` assignee. Read-only
   and gated like the AI summary (M54).
+- [x] **M57 — AI smart reply suggestions.** A "💬 Suggest a reply" button
+  drafts a few short replies from the conversation's recent messages via
+  Workers AI; tapping a suggestion chip drops it into the composer, still
+  editable. Read-only and gated like the AI summary (M54).
 
 ## Surprises & Discoveries
 
@@ -1300,6 +1304,20 @@ model call is a `503 { available: false }`, an explicit model "NONE" reply is
 an empty list. The UI adds a "✅ To-dos" button beside "✨ Catch me up" that
 renders the items as a bulleted bar. No write path — read-only, so no
 Write-Path Checklist entry.
+
+**M57 — AI smart reply suggestions.** Another read-only sibling of the M54
+summary. `GET /api/conversations/[slug]/suggestions` feeds the last ~16
+readable messages to `@cf/meta/llama-3.1-8b-instruct` and asks for three short
+replies the next person might send. `src/lib/server/reply-suggestions.ts` holds
+the pure `parseSuggestions` parser — bullet extraction plus stripping stray
+numbering and wrapping quotes, capped and de-duped — unit-covered in
+`reply-suggestions.test.ts` (5 cases). Gating matches the summary: 404 for an
+unknown conversation, `503 { available: false }` with no Workers AI binding, a
+failed call, or no parseable suggestions. The UI adds a "💬 Suggest a reply"
+button; the results render as tappable chips above the composer, and tapping
+one drops the text into the draft (still editable) rather than sending it. The
+chip row clears on a thread switch and after a successful send. No write path —
+read-only, so no Write-Path Checklist entry.
 
 ## Concrete Steps
 
