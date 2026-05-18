@@ -105,6 +105,38 @@ test.describe('household memory API', () => {
 		expect(res.status()).toBe(400);
 	});
 
+	test('the proposed-facts list is adult-gated and returns an array (M73)', async ({
+		request
+	}) => {
+		const ok = await request.get('/api/memory/proposed?personId=person-matt');
+		expect(ok.status()).toBe(200);
+		expect(Array.isArray(await ok.json())).toBe(true);
+
+		const denied = await request.get('/api/memory/proposed?personId=person-three');
+		expect(denied.status()).toBe(403);
+	});
+
+	test('confirm and reject are adult-gated and no-op on an unknown fact (M73)', async ({
+		request
+	}) => {
+		const confirm = await request.post('/api/memory/facts/no-such-fact/confirm', {
+			data: { personId: 'person-matt' }
+		});
+		expect(confirm.status()).toBe(200);
+		expect((await confirm.json()).confirmed).toBe(false);
+
+		const reject = await request.post('/api/memory/facts/no-such-fact/reject', {
+			data: { personId: 'person-matt' }
+		});
+		expect(reject.status()).toBe(200);
+		expect((await reject.json()).rejected).toBe(false);
+
+		const denied = await request.post('/api/memory/facts/no-such-fact/confirm', {
+			data: { personId: 'person-three' }
+		});
+		expect(denied.status()).toBe(403);
+	});
+
 	test('the entities list is adult-gated and returns an array', async ({ request }) => {
 		await request.post('/api/memory/facts', {
 			data: {

@@ -22,13 +22,14 @@ You can see it working when, after connecting the pieces, you open the Household
 
 - [x] (2026-05-18 18:12Z) M71 — Memory graph schema and explicit capture: migration `0012_memory_graph.sql` (the two tables plus a `people.role` column), `memory-kinds.ts`, typed DB helpers (`upsertEntity`, `insertFact`, `confirmFact`, `factsForSubject`, `findEntityByName`, `isAdult`), adult-gated `/api/memory/facts` and `/api/memory/entities` routes, manifest updated, parity test `memory-kinds.test.ts`, E2E `api-memory.spec.ts`. Gates green: check 449 files, unit 134, build, e2e api-memory 5.
 - [x] (2026-05-18 18:22Z) M72 — Semantic recall and the "Ask the household" UI: the `household-hub-facts` Vectorize index created and bound as `VECTORIZE_FACTS`; `memory-index.ts` (`factSentence`, `indexFact`, `relevantFactIds`); explicit facts indexed on write; `POST /api/memory/ask` answering from recent + semantically-relevant facts; a "🧠 Household memory" box on the Household page with an adult asker selector. Gates green: check 453, unit 138, build, e2e api-memory 8.
-- [ ] M73 — AI fact extraction from conversations: candidate facts proposed after a message, a confirm/reject review UI, confirmed facts entering the graph.
+- [x] (2026-05-18 18:31Z) M73 — AI fact extraction from conversations: `memory-extract.ts` (`parseExtractedFacts`, `extractFacts`) wired into the messages POST route via `waitUntil`; `GET /api/memory/proposed`; `POST /api/memory/facts/[id]/confirm` (indexes the fact) and `.../reject`; a "facts to review" panel on the Household page. Gates green: check 461, unit 144, build, e2e api-memory 10.
 - [ ] M74 — Gmail OAuth connection (spike + build): the OAuth flow, the `google_accounts` table, token storage and refresh; validates the restricted-scope situation before any ingestion is built.
 - [ ] M75 — Gmail ingestion to fact extraction: cron-driven incremental sync, extraction into the propose→confirm loop, no raw email bodies stored.
 - [ ] M76 — Coordination view: a calendar over time-bound facts and a shared shopping list over `needs` facts.
 - [ ] M77 — The app's own changelog: when a dev-channel build merges, the runner posts a plain-language changelog entry into a channel (#6 from the brainstorm).
 
-M71 and M72 are complete and deployed. M73 is next.
+M71, M72, and M73 are complete and deployed. M74 is next, gated on the
+operator's Google Cloud OAuth setup.
 
 
 ## Context and Orientation

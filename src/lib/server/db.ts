@@ -781,3 +781,51 @@ export async function factsForSubject(
 		.all<MemoryFact>();
 	return results;
 }
+
+// A memory fact joined with its subject and (optional) object entity names —
+// the shape the proposed-fact review UI and the recall layer want (M73).
+export interface FactWithNames extends MemoryFact {
+	subject_name: string;
+	object_name: string | null;
+}
+
+const FACT_WITH_NAMES_SELECT = `
+	SELECT f.id, f.subject_id, f.predicate, f.object_text, f.object_entity_id,
+	       f.valid_at, f.confidence, f.status, f.source, f.source_message_id,
+	       f.source_ref, f.created_at, f.confirmed_at, f.confirmed_by,
+	       s.name AS subject_name, o.name AS object_name
+	FROM memory_facts f
+	JOIN memory_entities s ON s.id = f.subject_id
+	LEFT JOIN memory_entities o ON o.id = f.object_entity_id`;
+
+/** Every proposed (awaiting-confirmation) fact, newest first, with names. */
+export async function proposedFactsWithNames(db: D1Database): Promise<FactWithNames[]> {
+	const { results } = await db
+		.prepare(`${FACT_WITH_NAMES_SELECT} WHERE f.status = 'proposed' ORDER BY f.created_at DESC`)
+		.all<FactWithNames>();
+	return results;
+}
+
+/** One fact by id, with its subject/object names, or null. */
+export async function factWithNames(
+	db: D1Database,
+	id: string
+): Promise<FactWithNames | null> {
+	return await db
+		.prepare(`${FACT_WITH_NAMES_SELECT} WHERE f.id = ?`)
+		.bind(id)
+		.first<FactWithNames>();
+}
+
+/**
+ * Reject (delete) a proposed fact. The `status = 'proposed'` guard means a
+ * confirmed fact can never be removed by this path. Returns true if a row was
+ * deleted.
+ */
+export async function rejectProposedFact(db: D1Database, id: string): Promise<boolean> {
+	const res = await db
+		.prepare("DELETE FROM memory_facts WHERE id = ? AND status = 'proposed'")
+		.bind(id)
+		.run();
+	return (res.meta.changes ?? 0) > 0;
+}

@@ -42,6 +42,18 @@
 	$effect(() => {
 		if (memoryPersonId === '' && adults.length > 0) memoryPersonId = adults[0].id;
 	});
+	// Facts the AI proposed (M73), awaiting a member's confirm/reject.
+	interface ProposedFact {
+		id: string;
+		predicate: string;
+		object_text: string | null;
+		object_name: string | null;
+		subject_name: string;
+	}
+	let proposedFacts = $state<ProposedFact[]>([]);
+	$effect(() => {
+		if (memoryPersonId !== '') loadProposed();
+	});
 
 	async function load() {
 		try {
@@ -179,6 +191,33 @@
 		}
 	}
 
+	// Household memory (M73): load the facts awaiting review, and confirm or
+	// reject one. The asking adult is the reviewer.
+	async function loadProposed() {
+		if (memoryPersonId === '') return;
+		try {
+			const res = await fetch(
+				`/api/memory/proposed?personId=${encodeURIComponent(memoryPersonId)}`
+			);
+			if (res.ok) proposedFacts = await res.json();
+		} catch {
+			// transient — the review list just stays as it was
+		}
+	}
+
+	async function reviewFact(id: string, action: 'confirm' | 'reject') {
+		try {
+			const res = await fetch(`/api/memory/facts/${id}/${action}`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ personId: memoryPersonId })
+			});
+			if (res.ok) proposedFacts = proposedFacts.filter((f) => f.id !== id);
+		} catch {
+			// transient
+		}
+	}
+
 	onMount(load);
 </script>
 
@@ -244,6 +283,34 @@
 			</form>
 			{#if memoryAnswer || memoryError}
 				<div class="memory-answer">{memoryError || memoryAnswer}</div>
+			{/if}
+			{#if proposedFacts.length > 0}
+				<div class="memory-review">
+					<h3 class="memory-review-title">
+						{proposedFacts.length} fact{proposedFacts.length === 1 ? '' : 's'} to review
+					</h3>
+					<p class="memory-hint">
+						The AI noticed these in conversations. Confirm one to make it answerable.
+					</p>
+					<ul class="memory-review-list">
+						{#each proposedFacts as f (f.id)}
+							<li class="memory-review-item">
+								<span class="memory-review-text">
+									<strong>{f.subject_name}</strong> — {f.predicate.replace(/_/g, ' ')}:
+									{f.object_text ?? f.object_name}
+								</span>
+								<span class="memory-review-actions">
+									<button type="button" onclick={() => reviewFact(f.id, 'confirm')}>
+										Confirm
+									</button>
+									<button type="button" onclick={() => reviewFact(f.id, 'reject')}>
+										Reject
+									</button>
+								</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
 			{/if}
 		</section>
 	{/if}
@@ -450,6 +517,47 @@
 		border-radius: 0.5rem;
 		font-size: 0.88rem;
 		white-space: pre-wrap;
+	}
+
+	.memory-review {
+		margin-top: 0.8rem;
+	}
+
+	.memory-review-title {
+		font-size: 0.9rem;
+		margin: 0 0 0.2rem;
+	}
+
+	.memory-review-list {
+		list-style: none;
+		padding: 0;
+		margin: 0.4rem 0 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.memory-review-item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.4rem;
+		padding: 0.4rem 0.6rem;
+		background: var(--raised, var(--surface));
+		border: 1px solid var(--border);
+		border-radius: 0.4rem;
+		font-size: 0.85rem;
+	}
+
+	.memory-review-actions {
+		display: flex;
+		gap: 0.3rem;
+	}
+
+	.memory-review-actions button {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.5rem;
 	}
 
 	.sr-only {
