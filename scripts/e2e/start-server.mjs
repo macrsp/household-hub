@@ -57,10 +57,16 @@ run('node', [
 	STATE_DIR
 ]);
 
-// Generate a wrangler config without the `ai` binding (and without
-// `pages_build_output_dir`, since the build dir is passed positionally) into
-// a temp directory; `wrangler pages dev` runs with that directory as its cwd.
+// Generate a wrangler config without the `ai` and `vectorize` bindings (and
+// without `pages_build_output_dir`, since the build dir is passed
+// positionally) into a temp directory; `wrangler pages dev` runs with that
+// directory as its cwd. Both `ai` and `vectorize` make `wrangler pages dev`
+// open a remote proxy session needing account auth the CI runner lacks — with
+// them absent, the AI and semantic-search routes report themselves
+// unavailable, which is exactly what their E2E tests assert. `vectorize` is
+// stripped before `ai` so each strip can match its own leading comma.
 const e2eConfig = readFileSync(resolve(REPO, 'wrangler.jsonc'), 'utf8')
+	.replace(/,\s*(?:\/\/[^\n]*\n\s*)*"vectorize"\s*:\s*\[[^\]]*\]/, '')
 	.replace(/,\s*(?:\/\/[^\n]*\n\s*)*"ai"\s*:\s*\{[^}]*\}/, '')
 	.replace(/\s*"pages_build_output_dir"\s*:\s*"[^"]*"\s*,/, '');
 const configDir = mkdtempSync(join(tmpdir(), 'hh-e2e-'));

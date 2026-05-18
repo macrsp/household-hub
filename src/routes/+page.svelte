@@ -91,6 +91,12 @@
 	let globalSearch = $state(false);
 	let globalSearchMode = $state(false);
 	let globalResults = $state<GlobalResult[]>([]);
+	// Semantic search (M66): the "Smart" toggle searches by meaning via
+	// Vectorize; its results render through the cross-conversation result list.
+	let smartSearch = $state(false);
+	let lastSearchWasSemantic = $state(false);
+	let lastSearchAllConvs = $state(false);
+	let semanticUnavailable = $state(false);
 	let globalLastSearch = $state('');
 	// AI "catch me up" summary of the active conversation (M54).
 	let summaryText = $state('');
@@ -387,6 +393,8 @@
 	}
 
 	// Search the active conversation's message bodies for the typed term.
+	// "Smart" runs a meaning-based search via Vectorize (M66); "All" scopes it
+	// to the whole household instead of the active thread.
 	async function runSearch() {
 		const q = searchInput.trim();
 		if (q === '') {
@@ -394,11 +402,26 @@
 			return;
 		}
 		try {
-			if (globalSearch) {
+			if (smartSearch) {
+				const scope = globalSearch ? '' : `&slug=${encodeURIComponent(activeSlug)}`;
+				const res = await fetch(`/api/search/semantic?q=${encodeURIComponent(q)}${scope}`);
+				const data = (await res.json().catch(() => null)) as
+					| { available?: boolean; results?: GlobalResult[] }
+					| null;
+				semanticUnavailable = !(res.ok && data?.available);
+				globalResults = semanticUnavailable ? [] : (data?.results ?? []);
+				globalLastSearch = q;
+				lastSearchWasSemantic = true;
+				lastSearchAllConvs = globalSearch;
+				globalSearchMode = true;
+				searchMode = false;
+			} else if (globalSearch) {
 				const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
 				if (!res.ok) return;
 				globalResults = await res.json();
 				globalLastSearch = q;
+				lastSearchWasSemantic = false;
+				semanticUnavailable = false;
 				globalSearchMode = true;
 				searchMode = false;
 			} else {
@@ -424,6 +447,9 @@
 		globalSearchMode = false;
 		globalResults = [];
 		globalLastSearch = '';
+		lastSearchWasSemantic = false;
+		lastSearchAllConvs = false;
+		semanticUnavailable = false;
 	}
 
 	// AI summary (M54): fetch a "catch me up" summary of the active thread.
@@ -1388,6 +1414,10 @@
 				<input type="checkbox" bind:checked={globalSearch} />
 				All
 			</label>
+			<label class="search-all" title="Search by meaning, not exact words">
+				<input type="checkbox" bind:checked={smartSearch} />
+				Smart
+			</label>
 			{#if searchMode || globalSearchMode}
 				<button type="button" onclick={clearSearch}>Clear</button>
 			{/if}
@@ -1475,8 +1505,16 @@
 		{/if}
 		{#if globalSearchMode}
 			<p class="search-banner">
-				{globalResults.length} result{globalResults.length === 1 ? '' : 's'} across all
-				conversations for “{globalLastSearch}”
+				{#if semanticUnavailable}
+					Smart search isn’t available right now.
+				{:else}
+					{globalResults.length}
+					{lastSearchWasSemantic ? 'smart ' : ''}result{globalResults.length === 1 ? '' : 's'}
+					{lastSearchWasSemantic && !lastSearchAllConvs
+						? `in #${activeSlug}`
+						: 'across all conversations'}
+					for “{globalLastSearch}”
+				{/if}
 			</p>
 			{#each globalResults as r (r.id)}
 				<button

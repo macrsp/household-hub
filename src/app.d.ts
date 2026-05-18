@@ -33,6 +33,10 @@ declare global {
 				// Cloudflare Workers AI binding. Present in production; absent
 				// in local/CI, where AI features report themselves unavailable.
 				AI?: Ai;
+				// Cloudflare Vectorize index for semantic message search (M66).
+				// Present in production; absent in local/CI, where semantic
+				// search reports itself unavailable.
+				VECTORIZE?: VectorizeIndex;
 			};
 			// The Cloudflare execution context — `waitUntil` keeps background
 			// work (e.g. the @claude assistant reply) alive past the response.

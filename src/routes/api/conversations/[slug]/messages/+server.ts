@@ -5,6 +5,7 @@ import { insertMessage, loadReactions, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
 import { notifyPushSubscribers } from '$lib/server/push';
 import { mentionsClaude, maybeAssistantReply } from '$lib/server/assistant';
+import { indexMessage } from '$lib/server/semantic-index';
 import { nowIso } from '$lib/server/time';
 
 // Resolve a conversation row id from its URL slug, or 404.
@@ -151,6 +152,15 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		await notifyPushSubscribers(platform!.env, db, message.author_person_id);
 	} catch (e) {
 		console.error('[push] notify failed for message', message.id, e);
+	}
+
+	// Index the message for semantic search (M66). Best-effort, after the
+	// response via waitUntil so the send is never delayed; a no-op when
+	// Workers AI or the Vectorize binding is unconfigured.
+	{
+		const indexTask = indexMessage(platform!.env, message);
+		if (platform?.context?.waitUntil) platform.context.waitUntil(indexTask);
+		else await indexTask;
 	}
 
 	// If the message @-mentions Claude, generate an assistant reply (M55).
