@@ -107,6 +107,9 @@
 	// AI compose-assist (M58): polishing the current draft.
 	let polishing = $state(false);
 	let polishError = $state('');
+	// AI conversation auto-title (M59): suggesting a name in the Manage panel.
+	let titleSuggesting = $state(false);
+	let titleError = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Member ids selected for a new conversation (M47) — defaults to everyone.
@@ -567,8 +570,32 @@
 	// Conversation management (M27): rename and archive the active thread.
 	function openManage() {
 		renameInput = activeConversation?.name ?? '';
+		titleError = '';
 		managingConversation = true;
 		loadManageParticipants();
+	}
+
+	// AI auto-title (M59): suggest a name for the active conversation and drop
+	// it into the rename field for the user to review before saving.
+	async function suggestTitle() {
+		if (titleSuggesting) return;
+		titleError = '';
+		titleSuggesting = true;
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/title-suggestion`);
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; title?: string }
+				| null;
+			if (res.ok && data?.available && data.title) {
+				renameInput = data.title;
+			} else {
+				titleError = 'No name suggestion right now.';
+			}
+		} catch {
+			titleError = 'Could not load a suggestion — network error.';
+		} finally {
+			titleSuggesting = false;
+		}
 	}
 
 	// The person ids participating in the active conversation (M43) — drives
@@ -1195,6 +1222,14 @@
 					bind:value={renameInput}
 					autocomplete="off"
 				/>
+				<button
+					type="button"
+					onclick={suggestTitle}
+					disabled={titleSuggesting}
+					title="Suggest a name with AI"
+				>
+					{titleSuggesting ? 'Thinking…' : '✨ Suggest'}
+				</button>
 				<button type="submit">Rename</button>
 				<button type="button" onclick={toggleArchive}>
 					{activeConversation.archived_at ? 'Unarchive' : 'Archive'}
@@ -1211,6 +1246,9 @@
 				</a>
 				<button type="button" onclick={closeManage}>Done</button>
 			</form>
+			{#if titleError}
+				<p class="manage-title-error">{titleError}</p>
+			{/if}
 			<div class="manage-members">
 				<span class="manage-members-label">Members in #{activeSlug}:</span>
 				{#each people as person (person.id)}
@@ -1726,6 +1764,12 @@
 	.new-conv-members-label {
 		font-weight: 600;
 		width: 100%;
+	}
+
+	.manage-title-error {
+		margin: 0.4rem 0 0;
+		font-size: 0.8rem;
+		color: var(--dim);
 	}
 
 	.member-toggle {

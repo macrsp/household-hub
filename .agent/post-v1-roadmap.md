@@ -271,6 +271,11 @@ when each is reached.
   current draft to be clearer and warmer via Workers AI, replacing the draft
   text in place for the sender to review before sending. Stateless — writes
   nothing — and gated like the AI summary (M54).
+- [x] **M59 — AI conversation auto-title.** A "✨ Suggest" button in the Manage
+  panel drafts a short name for the conversation from its recent messages via
+  Workers AI and drops it into the rename field, where the user reviews it and
+  saves via the existing rename path. Read-only and gated like the AI summary
+  (M54).
 
 ## Surprises & Discoveries
 
@@ -1336,6 +1341,20 @@ it is stateless — an empty or missing `text` is a 400, an over-long draft is a
 The composer gains a "✨" button beside Send that replaces the draft text with
 the rewrite in place; `e2e/api-assist.spec.ts` covers the route. No database
 write — no Write-Path Checklist entry.
+
+**M59 — AI conversation auto-title.** `GET /api/conversations/[slug]/title-
+suggestion` reads the last ~30 messages and asks `@cf/meta/llama-3.1-8b-
+instruct` for a short Title-Case name. `src/lib/server/conversation-title.ts`
+holds the pure `cleanTitle` helper — first non-empty line, bullet/numbering and
+wrapping-quote stripping, trailing-period trim, length cap — unit-covered in
+`conversation-title.test.ts` (6 cases). Gating matches the summary: 404 for an
+unknown conversation, `503 { available: false }` with no Workers AI binding or
+a failed call; a conversation with no messages is a non-failure
+`200 { available: true, title: '' }`. The Manage panel gains a "✨ Suggest"
+button that drops the suggestion into the existing rename field — the AI never
+writes the name itself; the user reviews it and saves through the existing
+`PATCH /api/conversations/[slug]` rename path, so no new `conversations` write
+path and no Write-Path Checklist entry.
 
 ## Concrete Steps
 
