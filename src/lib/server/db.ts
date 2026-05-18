@@ -47,6 +47,27 @@ export interface DeliveryRow {
 	updated_at: string;
 }
 
+export interface SmsConsent {
+	id: string;
+	name: string;
+	phone: string;
+	consented_at: string;
+}
+
+/**
+ * Record one SMS opt-in consent — the audit trail behind the /sms-opt-in
+ * form (M34). The route validates the payload before calling this; this is
+ * the only runtime write path to `sms_consents`.
+ */
+export async function insertSmsConsent(db: D1Database, c: SmsConsent): Promise<void> {
+	await db
+		.prepare(
+			'INSERT INTO sms_consents (id, name, phone, consented_at) VALUES (?, ?, ?, ?)'
+		)
+		.bind(c.id, c.name, c.phone, c.consented_at)
+		.run();
+}
+
 /** Insert one canonical message. */
 export async function insertMessage(db: D1Database, m: Message): Promise<void> {
 	await db

@@ -185,6 +185,11 @@ when each is reached.
   `/privacy` becomes privacy-only and cross-links it. Clears the A2P 10DLC
   "Terms and Conditions" campaign rejection, whose root cause was the Terms of
   Service field pointing at the privacy URL.
+- [ ] **M34 — SMS opt-in consent page.** A `/sms-opt-in` form records each
+  household member's explicit, documented consent to receive texts into a new
+  `sms_consents` table. Clears the A2P 10DLC "Opt-in information" campaign
+  rejection, whose root cause was a verbal-only consent narrative with no
+  verifiable opt-in mechanism.
 
 ## Surprises & Discoveries
 
@@ -778,6 +783,35 @@ STOP, carrier-liability, and a support contact. `/privacy` is retitled
 instead of the verbal/in-person narrative that contributed to the second
 rejection, and cross-links `/sms-terms`. The home-page footer links both
 pages, and `e2e/ui-smoke.spec.ts` gains a check that `/sms-terms` loads.
+
+**M34 — SMS opt-in consent page.** The A2P 10DLC campaign's second rejection
+banner was "Opt-in information": consent was described as verbal/in-person
+with no opt-in keywords and no opt-in form, so the reviewer had no verifiable
+evidence of consent. M34 adds the verifiable mechanism. Migration
+`0006_sms_consents.sql` creates an `sms_consents` table (`id`, `name`,
+`phone`, `consented_at`). A new `/sms-opt-in` page carries the required
+disclosure language and a form — name, mobile number, and an explicit consent
+checkbox — that POSTs to `POST /api/sms-consent`. The route validates the
+payload and records one row; that row, and the public form itself, are the
+documented consent the reviewer needs (the household administrator gives them
+the URL and a screenshot). `/sms-terms` and `/privacy` already forward-link
+`/sms-opt-in`. `scripts/probe-d1.mjs` gains an `sms_consents` probe; the
+`/api/test/reset` route also wipes the new table; `e2e/api-sms-consent.spec.ts`
+covers the route's validation and the page's happy path.
+
+User-Asset Write-Path Checklist (M34): the touched class is the new
+`sms_consents` table. The write path is the single typed helper
+`insertSmsConsent` in `src/lib/server/db.ts`; the server gate is the `POST`
+handler in `src/routes/api/sms-consent/+server.ts`, which requires a non-empty
+name, a phone with 10–15 digits, and `agreed === true` (the server enforces
+the consent checkbox, so a consent row can never exist without explicit
+agreement). No new string set is introduced, so no parity test is needed. The
+post-deploy probe for the class is the `sms_consents — blank name or phone`
+query added to `scripts/probe-d1.mjs`; `e2e/api-sms-consent.spec.ts` is the
+real-auth round-trip (valid 201, missing/false `agreed` 400, blank name 400,
+short phone 400, plus the page flow). No new try/catch wraps the write —
+`insertSmsConsent` is one statement and a failure throws to a 500 (no silent
+fallback).
 
 ## Concrete Steps
 
