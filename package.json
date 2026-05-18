@@ -19,6 +19,7 @@
 		"db:seed:remote": "wrangler d1 execute household-hub-db --remote --file ./seed.sql",
 		"probe:local": "node scripts/probe-d1.mjs --local",
 		"probe:remote": "node scripts/probe-d1.mjs --remote",
+		"claude-runner": "node scripts/claude-runner/run.mjs",
 		"deploy": "wrangler pages deploy .svelte-kit/cloudflare"
 	},
 	"devDependencies": {

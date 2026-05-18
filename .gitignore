@@ -13,3 +13,4 @@ playwright-report/
 .wrangler/
 .DS_Store
 *.log
+scripts/claude-runner/.runner-state.json

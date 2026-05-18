@@ -248,6 +248,10 @@ when each is reached.
   seeds a `person-claude` member and the `conv-claude` conversation; the
   messages API gains a `?since=` cursor so an external runner can poll for new
   requests.
+- [ ] **M53 — The dev-channel runner.** `scripts/claude-runner/run.mjs` polls
+  `#claude` for new requests, runs Claude Code headless on each, and posts the
+  result back into the channel. It runs on a cron on a host the operator
+  controls (household-hub itself cannot run Claude Code).
 
 ## Surprises & Discoveries
 
@@ -1209,6 +1213,26 @@ member, `person-claude`, like any other) — so no Write-Path Checklist; the
 existing `people`/`conversations`/`participants` probes cover the seeded rows.
 `e2e/api-dev-channel.spec.ts` covers the channel's existence, a request +
 Claude reply, and the `?since=` cursor.
+
+**M53 — The dev-channel runner.** No app code changes — `household-hub` runs
+on Cloudflare Pages and cannot run Claude Code, so the runner is a standalone
+component the operator hosts (the `email-worker/` precedent). `scripts/claude-
+runner/run.mjs` is a dependency-free Node script: each run it polls
+`GET /api/conversations/claude/messages?since=<cursor>`, keeps the
+human-authored requests (skipping `person-claude`'s own posts, optionally
+filtered to a `CLAUDE_REQUESTERS` allowlist), and for up to `MAX_REQUESTS` of
+them posts a "🛠️ On it" note, runs `claude -p "<framed request>"
+--output-format json --dangerously-skip-permissions` headless in a clone of
+the repo, and posts Claude Code's summary back as "✅ …". The cursor (last
+handled request) persists to a git-ignored `.runner-state.json`; the first run
+adopts "now" and handles no backlog. Guardrails: `MAX_REQUESTS` caps per-run
+cost; the prompt instructs Claude Code to follow `CLAUDE.md` — branch, gates,
+PR, deploy only on green — so a request that breaks the build never reaches
+the family app; the cursor advances past a failed request so it is not
+retried forever. `scripts/claude-runner/README.md` documents the host
+prerequisites (`claude` CLI, a repo clone with push access, `gh`), the
+environment, and a cron line. The operator supplies the host, an
+`ANTHROPIC_API_KEY`, and the cron entry.
 
 ## Concrete Steps
 
