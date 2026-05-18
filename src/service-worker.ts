@@ -43,3 +43,32 @@ sw.addEventListener('fetch', (event) => {
 		event.respondWith(caches.match(request).then((cached) => cached ?? fetch(request)));
 	}
 });
+
+// Web Push (M38). The server sends a payload-less "tickle" push, so there is
+// no body to read — show a generic notification. The household member opens
+// the app to see what changed.
+sw.addEventListener('push', (event) => {
+	event.waitUntil(
+		sw.registration.showNotification('Household Hub', {
+			body: 'New activity in your household conversation.',
+			icon: '/icon.svg',
+			badge: '/icon.svg',
+			tag: 'household-hub-message'
+		})
+	);
+});
+
+// Focus an existing household-hub tab on notification click, or open one.
+sw.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	event.waitUntil(
+		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+			for (const client of clients) {
+				if (client.url.includes(sw.location.origin) && 'focus' in client) {
+					return client.focus();
+				}
+			}
+			return sw.clients.openWindow('/');
+		})
+	);
+});

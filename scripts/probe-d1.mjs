@@ -85,6 +85,13 @@ const PROBES = [
 			'SELECT count(*) AS n FROM reactions ' +
 			'WHERE message_id NOT IN (SELECT id FROM messages) ' +
 			'OR person_id NOT IN (SELECT id FROM people)'
+	},
+	{
+		name: 'push_subscriptions — dangling person_id / blank endpoint',
+		sql:
+			'SELECT count(*) AS n FROM push_subscriptions ' +
+			'WHERE person_id NOT IN (SELECT id FROM people) ' +
+			"OR endpoint IS NULL OR endpoint = ''"
 	}
 ];
 

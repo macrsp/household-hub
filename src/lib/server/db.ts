@@ -230,6 +230,64 @@ export async function setMessagePinned(
 		.run();
 }
 
+export interface PushSubscriptionRow {
+	id: string;
+	person_id: string;
+	endpoint: string;
+	p256dh: string;
+	auth: string;
+	created_at: string;
+}
+
+/**
+ * Store (or refresh) a Web Push subscription (M38). Keyed on `endpoint`: a
+ * browser that re-subscribes with the same endpoint updates its row rather
+ * than creating a duplicate. The only runtime write path to
+ * `push_subscriptions` other than expiry cleanup.
+ */
+export async function upsertPushSubscription(
+	db: D1Database,
+	sub: PushSubscriptionRow
+): Promise<void> {
+	await db
+		.prepare(
+			`INSERT INTO push_subscriptions (id, person_id, endpoint, p256dh, auth, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(endpoint) DO UPDATE SET
+			   person_id = excluded.person_id,
+			   p256dh = excluded.p256dh,
+			   auth = excluded.auth`
+		)
+		.bind(sub.id, sub.person_id, sub.endpoint, sub.p256dh, sub.auth, sub.created_at)
+		.run();
+}
+
+/** Every stored push subscription. */
+export async function listPushSubscriptions(
+	db: D1Database
+): Promise<PushSubscriptionRow[]> {
+	const { results } = await db
+		.prepare('SELECT id, person_id, endpoint, p256dh, auth, created_at FROM push_subscriptions')
+		.all<PushSubscriptionRow>();
+	return results;
+}
+
+/** Remove a push subscription by its endpoint (browser unsubscribe). */
+export async function deletePushSubscriptionByEndpoint(
+	db: D1Database,
+	endpoint: string
+): Promise<void> {
+	await db
+		.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?')
+		.bind(endpoint)
+		.run();
+}
+
+/** Remove a push subscription by id (used to prune an expired endpoint). */
+export async function deletePushSubscription(db: D1Database, id: string): Promise<void> {
+	await db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(id).run();
+}
+
 /** Insert one delivery attempt row (typically with status 'pending'). */
 export async function insertDelivery(db: D1Database, d: DeliveryRow): Promise<void> {
 	await db

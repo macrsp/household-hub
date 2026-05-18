@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
 import { insertMessage, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
+import { notifyPushSubscribers } from '$lib/server/push';
 import { conversationSlugFromEmailAddress } from '$lib/server/routing';
 import { nowIso } from '$lib/server/time';
 
@@ -93,6 +94,13 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		await fanoutMessage(db, platform!.env, message.id);
 	} catch (e) {
 		console.error('[fanout] failed for inbound email message', message.id, e);
+	}
+
+	// Notify subscribed devices over Web Push (M38); a no-op if unconfigured.
+	try {
+		await notifyPushSubscribers(platform!.env, db, message.author_person_id);
+	} catch (e) {
+		console.error('[push] notify failed for inbound email message', message.id, e);
 	}
 
 	return json({ ok: true, messageId: message.id });
