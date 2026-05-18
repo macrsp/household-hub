@@ -647,10 +647,17 @@
 
 	async function send() {
 		const body = draft.trim();
-		if (body === '' || senderId === '' || sending) return;
+		if (body === '' || sending) return;
 		sending = true;
 		errorText = '';
 		try {
+			// The roster may still be loading right after the app opens. Wait
+			// for it rather than silently dropping the send (M51).
+			if (senderId === '') await loadPeople();
+			if (senderId === '') {
+				errorText = 'Still connecting — please try again in a moment.';
+				return;
+			}
 			const res = await fetch(`/api/conversations/${activeSlug}/messages`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -1319,7 +1326,7 @@
 			oninput={() => saveDraft(activeSlug)}
 			autocomplete="off"
 		/>
-		<button type="submit" disabled={sending || draft.trim() === '' || senderId === ''}>
+		<button type="submit" disabled={sending || draft.trim() === ''}>
 			{sending ? 'Sending…' : 'Send'}
 		</button>
 	</form>

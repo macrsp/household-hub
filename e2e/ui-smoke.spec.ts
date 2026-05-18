@@ -23,6 +23,16 @@ test.describe('conversation UI', () => {
 		await expect(page.getByText('hello from playwright')).toBeVisible();
 	});
 
+	test('sending immediately on a cold open is not dropped (M51)', async ({ page, request }) => {
+		await resetDatabase(request);
+		await page.goto('/');
+		// Do NOT wait for the roster to load — fill and Send right away. The
+		// composer must wait for readiness internally rather than dropping it.
+		await page.getByPlaceholder(/Message #general/).fill('cold-open message');
+		await page.getByRole('button', { name: 'Send' }).click();
+		await expect(page.getByText('cold-open message')).toBeVisible();
+	});
+
 	test('Escape closes the new-conversation form', async ({ page, request }) => {
 		await resetDatabase(request);
 		await page.goto('/');
