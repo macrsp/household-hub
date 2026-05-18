@@ -61,6 +61,12 @@ const PROBES = [
 			'WHERE edited_at IS NOT NULL AND edited_at < created_at'
 	},
 	{
+		name: 'messages — pinned_at earlier than created_at',
+		sql:
+			'SELECT count(*) AS n FROM messages ' +
+			'WHERE pinned_at IS NOT NULL AND pinned_at < created_at'
+	},
+	{
 		name: 'deliveries — dangling message_id / endpoint_id',
 		sql:
 			'SELECT count(*) AS n FROM deliveries ' +

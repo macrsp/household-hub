@@ -198,6 +198,9 @@ when each is reached.
 - [ ] **M36 — Message reactions.** Household members can react to a message
   with one of a fixed emoji set; reactions are tallied per message, toggle on
   and off, and propagate to every open client over the SSE stream.
+- [ ] **M37 — Pinned messages.** Any household member can pin an important
+  message; pinned messages show in a bar at the top of the conversation, and
+  the pin state propagates over the SSE stream.
 
 ## Surprises & Discoveries
 
@@ -873,6 +876,35 @@ others — the parity test required by invariant 3. The post-deploy probe is
 400 on a bad emoji, 400 on an unknown person, 404 on an unknown message). No
 new try/catch wraps the write — `toggleReaction` issues one statement per
 branch and a failure throws to a 500 (no silent fallback).
+
+**M37 — Pinned messages.** Any household member can pin a message (a gate
+code, a schedule change) so it stays visible. Migration `0008_message_pinned
+.sql` adds a nullable `pinned_at` column to `messages`. The write path is the
+typed helper `setMessagePinned` in `db.ts` (`pinned: true` stamps `pinned_at`,
+`false` clears it). A new route
+`POST /api/conversations/[slug]/messages/[id]/pin` takes `{ pinned: boolean }`
+— pinning is a benign, reversible household action, so it is not
+author-restricted (unlike edit/delete); the route only requires the message
+to exist (404 otherwise, 400 on a non-boolean body). The messages list and
+the SSE stream expose `pinned_at`, and the stream's change marker gains the
+pin state so a pin/unpin re-emits the message. `+page.svelte` shows a pinned
+bar at the top of the conversation, a 📌 marker in a pinned message's meta
+row, and a Pin/Unpin control in every message's action row. `scripts/probe-
+d1.mjs` gains a `messages — pinned_at earlier than created_at` invariant.
+
+User-Asset Write-Path Checklist (M37): the touched class is `messages`. The
+write path is the single typed helper `setMessagePinned` in
+`src/lib/server/db.ts`; the server gate is the `POST` handler in
+`src/routes/api/conversations/[slug]/messages/[id]/pin/+server.ts`, which
+requires a boolean `pinned` body and an existing message in the conversation.
+Pinning is intentionally not author-restricted — it changes no message content
+and matches the household trust model. No new string set is introduced, so no
+parity test is needed. The post-deploy probe is the `messages — pinned_at
+earlier than created_at` query in `scripts/probe-d1.mjs`; `e2e/api-pin.spec.ts`
+is the real-auth round-trip (pin, unpin, 400 on a non-boolean, 400 on an empty
+body, 404 on an unknown message). No new try/catch wraps the write —
+`setMessagePinned` is one statement and a failure throws to a 500 (no silent
+fallback).
 
 ## Concrete Steps
 

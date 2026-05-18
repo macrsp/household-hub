@@ -34,6 +34,9 @@ export interface Message {
 	// Editing (M24): NULL until the author first edits the message, then an
 	// ISO 8601 string. Omitted on insert — a new message is unedited (NULL).
 	edited_at?: string | null;
+	// Pinning (M37): NULL while unpinned, an ISO 8601 string once pinned.
+	// Omitted on insert — a new message is unpinned (NULL).
+	pinned_at?: string | null;
 }
 
 export interface DeliveryRow {
@@ -209,6 +212,22 @@ export async function loadReactions(
 		if (summaries.length > 0) out.set(messageId, summaries);
 	}
 	return out;
+}
+
+/**
+ * Pin or unpin a message (M37): `pinned: true` stamps `pinned_at`,
+ * `pinned: false` clears it back to NULL. Pinning is a soft, reversible state
+ * any household member may set. The only runtime write path to `pinned_at`.
+ */
+export async function setMessagePinned(
+	db: D1Database,
+	messageId: string,
+	pinned: boolean
+): Promise<void> {
+	await db
+		.prepare('UPDATE messages SET pinned_at = ? WHERE id = ?')
+		.bind(pinned ? nowIso() : null, messageId)
+		.run();
 }
 
 /** Insert one delivery attempt row (typically with status 'pending'). */

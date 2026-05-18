@@ -37,6 +37,8 @@
 		edited_at?: string | null;
 		// Reactions (M36): per-emoji tallies, who reacted with each.
 		reactions?: Array<{ emoji: string; count: number; people: string[] }>;
+		// Pinning (M37): set while the message is pinned to the conversation.
+		pinned_at?: string | null;
 	}
 	interface Prefs {
 		muted: boolean;
@@ -88,6 +90,8 @@
 	let streamOpenedAt = '';
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
+	// Pinned messages in the active conversation, oldest-first (M37).
+	const pinnedMessages = $derived(messages.filter((m) => m.pinned_at && !m.deleted_at));
 	// Conversations split by archived state (M27).
 	const activeConversations = $derived(conversations.filter((c) => !c.archived_at));
 	const archivedConversations = $derived(conversations.filter((c) => c.archived_at));
@@ -610,6 +614,24 @@
 		reactionPickerFor = reactionPickerFor === messageId ? '' : messageId;
 	}
 
+	// Pinning (M37): pin or unpin a message. Optimistic; the SSE stream
+	// re-emits the message (its change marker includes pinned_at) to reconcile.
+	async function pinMessage(message: Message, pinned: boolean) {
+		messages = messages.map((m) =>
+			m.id === message.id ? { ...m, pinned_at: pinned ? new Date().toISOString() : null } : m
+		);
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/messages/${message.id}/pin`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ pinned })
+			});
+			if (!res.ok) errorText = `Could not ${pinned ? 'pin' : 'unpin'} (HTTP ${res.status}).`;
+		} catch {
+			errorText = `Could not ${pinned ? 'pin' : 'unpin'} — network error.`;
+		}
+	}
+
 	function onKeydown(event: KeyboardEvent) {
 		// Enter sends; Shift+Enter is a newline.
 		if (event.key === 'Enter' && !event.shiftKey) {
@@ -785,6 +807,19 @@
 	</header>
 
 	<section class="messages" bind:this={listEl} aria-live="polite" onscroll={updateAtBottom}>
+		{#if !searchMode && pinnedMessages.length > 0}
+			<div class="pinned-bar">
+				{#each pinnedMessages as p (p.id)}
+					<div class="pinned-row">
+						<span class="pinned-icon" aria-hidden="true">📌</span>
+						<span class="pinned-text"><strong>{p.author_name}:</strong> {p.body}</span>
+						<button type="button" class="pinned-unpin" onclick={() => pinMessage(p, false)}>
+							Unpin
+						</button>
+					</div>
+				{/each}
+			</div>
+		{/if}
 		{#if searchMode}
 			<p class="search-banner">
 				{searchResults.length} result{searchResults.length === 1 ? '' : 's'} for “{lastSearch}”
@@ -817,6 +852,9 @@
 						<span class="transport" title="arrived via {message.source_transport}">
 							{message.source_transport}
 						</span>
+						{#if message.pinned_at && !message.deleted_at}
+							<span class="pinned-flag" title="pinned">📌</span>
+						{/if}
 						<span class="time">{formatTime(message.created_at)}</span>
 						{#if message.edited_at && !message.deleted_at}
 							<span class="edited" title="edited {formatTime(message.edited_at)}">(edited)</span>
@@ -881,16 +919,23 @@
 								</span>
 							{/if}
 						</div>
-						{#if message.author_person_id === senderId}
-							<div class="msg-actions">
+						<div class="msg-actions">
+							<button
+								type="button"
+								class="action-btn"
+								onclick={() => pinMessage(message, !message.pinned_at)}
+							>
+								{message.pinned_at ? 'Unpin' : 'Pin'}
+							</button>
+							{#if message.author_person_id === senderId}
 								<button type="button" class="action-btn" onclick={() => startEdit(message)}>
 									Edit
 								</button>
 								<button type="button" class="action-btn" onclick={() => deleteMessage(message)}>
 									Delete
 								</button>
-							</div>
-						{/if}
+							{/if}
+						</div>
 					{/if}
 				</article>
 			{/each}
@@ -1286,6 +1331,53 @@
 		border: none;
 		background: none;
 		cursor: pointer;
+	}
+
+	.pinned-bar {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		padding: 0.5rem 0.6rem;
+		margin-bottom: 0.5rem;
+		background: var(--raised);
+		border: 1px solid var(--border);
+		border-radius: 0.5rem;
+	}
+
+	.pinned-row {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.8rem;
+	}
+
+	.pinned-icon {
+		flex: none;
+	}
+
+	.pinned-text {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--muted);
+	}
+
+	.pinned-unpin {
+		flex: none;
+		font: inherit;
+		font-size: 0.66rem;
+		padding: 0.1rem 0.45rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 0.3rem;
+		background: var(--surface);
+		color: var(--dim);
+		cursor: pointer;
+	}
+
+	.pinned-flag {
+		font-size: 0.7rem;
 	}
 
 	.edit-form {

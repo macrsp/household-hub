@@ -41,13 +41,13 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 				try {
 					const { results } = await db
 						.prepare(
-							`SELECT id, body, source_transport, created_at, deleted_at, edited_at,
+							`SELECT id, body, source_transport, created_at, deleted_at, edited_at, pinned_at,
 							        author_person_id, author_name,
 							        delivery_total, delivery_ok, delivery_failed
 							 FROM (
 							   SELECT m.id,
 							          CASE WHEN m.deleted_at IS NOT NULL THEN '' ELSE m.body END AS body,
-							          m.source_transport, m.created_at, m.deleted_at, m.edited_at,
+							          m.source_transport, m.created_at, m.deleted_at, m.edited_at, m.pinned_at,
 							          m.author_person_id, p.display_name AS author_name,
 							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id) AS delivery_total,
 							          (SELECT count(*) FROM deliveries d WHERE d.message_id = m.id
@@ -82,7 +82,7 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 							.join(',');
 						const marker = `${(row.deleted_at as string | null) ?? ''}|${
 							(row.edited_at as string | null) ?? ''
-						}|${rxnSig}`;
+						}|${(row.pinned_at as string | null) ?? ''}|${rxnSig}`;
 						if (seen.get(id) === marker) continue;
 						seen.set(id, marker);
 						controller.enqueue(encoder.encode(`data: ${JSON.stringify(row)}\n\n`));
