@@ -812,6 +812,23 @@
 		}
 	}
 
+	// Escape closes whatever transient UI is open, most-transient first (M48):
+	// the emoji picker, an open message editor, a pending reply, the new- or
+	// manage-conversation panels, then a search result view.
+	function onGlobalKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Escape') return;
+		if (reactionPickerFor !== '') reactionPickerFor = '';
+		else if (editingId !== '') cancelEdit();
+		else if (replyingTo !== '') cancelReply();
+		else if (creatingConversation) {
+			creatingConversation = false;
+			newConvName = '';
+		} else if (managingConversation) closeManage();
+		else if (searchMode || globalSearchMode) clearSearch();
+		else return;
+		event.preventDefault();
+	}
+
 	function formatTime(iso: string): string {
 		return new Date(iso).toLocaleString([], {
 			month: 'short',
@@ -847,6 +864,8 @@
 <svelte:head>
 	<title>Household Hub</title>
 </svelte:head>
+
+<svelte:window onkeydown={onGlobalKeydown} />
 
 <main>
 	<header>

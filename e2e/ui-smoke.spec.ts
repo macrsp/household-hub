@@ -19,6 +19,18 @@ test.describe('conversation UI', () => {
 		await expect(page.getByText('hello from playwright')).toBeVisible();
 	});
 
+	test('Escape closes the new-conversation form', async ({ page, request }) => {
+		await resetDatabase(request);
+		await page.goto('/');
+
+		await page.getByRole('button', { name: '+', exact: true }).click();
+		const nameField = page.getByPlaceholder('New conversation name');
+		await expect(nameField).toBeVisible();
+
+		await page.keyboard.press('Escape');
+		await expect(nameField).toBeHidden();
+	});
+
 	test('loads the privacy policy page', async ({ page }) => {
 		await page.goto('/privacy');
 		await expect(
