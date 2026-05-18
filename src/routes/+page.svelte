@@ -75,6 +75,8 @@
 	// the working copy of its name, and whether archived threads are revealed.
 	let managingConversation = $state(false);
 	let renameInput = $state('');
+	// Person ids in the active conversation, for the Manage panel members list (M43).
+	let manageParticipants = $state<Set<string>>(new Set());
 	let showArchived = $state(false);
 	let theme = $state<'auto' | 'light' | 'dark'>('auto');
 	// Inline message editing (M24): the id of the message being edited (or '')
@@ -367,6 +369,46 @@
 	function openManage() {
 		renameInput = activeConversation?.name ?? '';
 		managingConversation = true;
+		loadManageParticipants();
+	}
+
+	// The person ids participating in the active conversation (M43) — drives
+	// the member checkboxes in the Manage panel.
+	async function loadManageParticipants() {
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/participants`);
+			if (!res.ok) return;
+			const rows = (await res.json()) as Array<{ person_id: string }>;
+			manageParticipants = new Set(rows.map((r) => r.person_id));
+		} catch {
+			// transient — the panel just shows no members until reopened
+		}
+	}
+
+	// Add or remove a household member from the active conversation (M43).
+	async function toggleParticipant(personId: string, shouldBeIn: boolean) {
+		errorText = '';
+		try {
+			const res = shouldBeIn
+				? await fetch(`/api/conversations/${activeSlug}/participants`, {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ personId })
+					})
+				: await fetch(`/api/conversations/${activeSlug}/participants/${personId}`, {
+						method: 'DELETE'
+					});
+			if (!res.ok) {
+				errorText = `Could not update members (HTTP ${res.status}).`;
+				return;
+			}
+			const next = new Set(manageParticipants);
+			if (shouldBeIn) next.add(personId);
+			else next.delete(personId);
+			manageParticipants = next;
+		} catch {
+			errorText = 'Could not update members — network error.';
+		}
 	}
 
 	function closeManage() {
@@ -883,6 +925,19 @@
 				</a>
 				<button type="button" onclick={closeManage}>Done</button>
 			</form>
+			<div class="manage-members">
+				<span class="manage-members-label">Members in #{activeSlug}:</span>
+				{#each people as person (person.id)}
+					<label class="member-toggle">
+						<input
+							type="checkbox"
+							checked={manageParticipants.has(person.id)}
+							onchange={(e) => toggleParticipant(person.id, e.currentTarget.checked)}
+						/>
+						{person.display_name}
+					</label>
+				{/each}
+			</div>
 		{/if}
 		<form
 			class="search"
@@ -1248,6 +1303,27 @@
 		gap: 0.4rem;
 		margin-top: 0.5rem;
 		flex-wrap: wrap;
+	}
+
+	.manage-members {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.2rem 0.7rem;
+		margin-top: 0.5rem;
+		font-size: 0.82rem;
+	}
+
+	.manage-members-label {
+		font-weight: 600;
+		width: 100%;
+	}
+
+	.member-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		cursor: pointer;
 	}
 
 	.new-conv input,

@@ -430,6 +430,52 @@ export async function updateDeliveryStatus(
 		.run();
 }
 
+/** Add a person to a conversation as a participant (idempotent — M43). */
+export async function addParticipant(
+	db: D1Database,
+	conversationId: string,
+	personId: string
+): Promise<void> {
+	await db
+		.prepare(
+			`INSERT OR IGNORE INTO participants
+			 (conversation_id, person_id, delivery_preference, muted)
+			 VALUES (?, ?, 'all', 0)`
+		)
+		.bind(conversationId, personId)
+		.run();
+}
+
+/** Remove a person from a conversation's participants (M43). */
+export async function removeParticipant(
+	db: D1Database,
+	conversationId: string,
+	personId: string
+): Promise<void> {
+	await db
+		.prepare('DELETE FROM participants WHERE conversation_id = ? AND person_id = ?')
+		.bind(conversationId, personId)
+		.run();
+}
+
+/** The people participating in a conversation, with their display names. */
+export async function listParticipants(
+	db: D1Database,
+	conversationId: string
+): Promise<Array<{ person_id: string; display_name: string }>> {
+	const { results } = await db
+		.prepare(
+			`SELECT p.person_id AS person_id, pe.display_name AS display_name
+			 FROM participants p
+			 JOIN people pe ON pe.id = p.person_id
+			 WHERE p.conversation_id = ?
+			 ORDER BY pe.display_name`
+		)
+		.bind(conversationId)
+		.all<{ person_id: string; display_name: string }>();
+	return results;
+}
+
 /** Update a participant's notification preferences for one conversation. */
 export async function updateParticipantPrefs(
 	db: D1Database,

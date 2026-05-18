@@ -216,6 +216,9 @@ when each is reached.
   registered brand's own domain.
 - [ ] **M42 — Message replies.** A message can reply to an earlier message in
   the same conversation; the reply shows a quoted reference to its target.
+- [ ] **M43 — Conversation participant management.** A conversation can have
+  members added or removed; the Manage panel shows a member checklist, so a
+  thread can hold a subset of the household rather than always everyone.
 
 ## Surprises & Discoveries
 
@@ -1037,6 +1040,32 @@ query in `scripts/probe-d1.mjs`; `e2e/api-replies.spec.ts` is the real-auth
 round-trip (a reply stores the target, a plain message is null, a bad target
 is 400, a cross-conversation target is 400). No new try/catch wraps the
 write — `insertMessage` is one statement.
+
+**M43 — Conversation participant management.** A conversation's membership was
+fixed (M18/M40 add every member to every conversation); M43 lets it be a
+subset. No migration — the `participants` table exists. `db.ts` gains
+`addParticipant` (`INSERT OR IGNORE` — idempotent), `removeParticipant`, and
+`listParticipants`. New collection route
+`GET|POST /api/conversations/[slug]/participants` lists members and adds one;
+`DELETE /api/conversations/[slug]/participants/[personId]` removes one (404 if
+not a participant). Fanout already iterates `participants`, so a removed
+member simply stops receiving the thread's messages — no fanout change needed.
+`+page.svelte`'s Manage panel gains a member checklist toggling each household
+member in or out of the active conversation.
+
+User-Asset Write-Path Checklist (M43): the touched class is `participants`.
+The write paths are the typed helpers `addParticipant` and `removeParticipant`
+in `src/lib/server/db.ts`. The server gates are the route handlers: `POST
+/api/conversations/[slug]/participants` requires an existing conversation
+(404) and a known `personId` (400); `DELETE …/participants/[personId]`
+resolves the participant first (404 if absent) before removing. `addParticipant`
+is `INSERT OR IGNORE`, so a double-add is a harmless no-op. No new string set,
+so no parity test. The `participants` post-deploy probe already exists in
+`scripts/probe-d1.mjs`; `e2e/api-participants.spec.ts` is the real-auth
+round-trip (list, remove + re-add, idempotent add, 400 unknown person, 404
+unknown conversation, 404 remove-non-participant, messaging still works after a
+removal). No new try/catch wraps a user-asset write — each helper is one
+statement.
 
 ## Concrete Steps
 
