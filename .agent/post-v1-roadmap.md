@@ -172,6 +172,11 @@ when each is reached.
 - [ ] **M30 — Export conversation transcript.** `GET …/export` returns the
   whole conversation as a plain-text file download; the Manage panel gets an
   Export link.
+- [ ] **M31 — End-to-end test harness.** A Playwright lane drives the real
+  SvelteKit stack on `wrangler pages dev` over a local D1 — covering the
+  message/conversation API, the webhook authentication gates, and the
+  conversation UI — backed by a gated test-only `/api/test/reset` route, and
+  wired into CI.
 
 ## Surprises & Discoveries
 
@@ -701,6 +706,42 @@ browser downloads it. A soft-deleted message becomes a `[deleted]` line and an
 edited one is suffixed `(edited)` — the transcript stays honest without
 exposing retracted text. `+page.svelte` adds an Export link (a download
 anchor) to the conversation Manage panel.
+
+**M31 — End-to-end test harness.** The repo had 41 unit tests over the pure
+server helpers but nothing exercised the API routes, the webhook auth gates,
+or the UI. M31 adds a Playwright lane: `playwright.config.ts` (testDir `e2e/`,
+one worker, Chromium) with a `webServer` that runs `scripts/e2e/start-server
+.mjs` — which builds, applies the D1 migrations to the local database, and
+starts `wrangler pages dev` with two test-only bindings. `e2e/` holds five
+specs — `api-messages`, `api-message-mutations`, `api-conversations`,
+`api-webhook-auth`, and a `ui-smoke` browser test — covering message
+post/read/search, the soft-delete and edit author gates, conversation
+create/rename/archive/export, the inbound-email shared-secret gate, inbound
+SMS, and the conversation page itself. A gated test-only route
+`POST /api/test/reset` wipes D1 and re-inserts a fixed seed fixture so each
+test starts clean. `package.json` gains `test:e2e`, and `ci.yml` gains an
+`e2e` job that installs Chromium and runs the lane. Vitest already scopes
+itself to `src/**/*.test.ts`, so it does not collect the Playwright `.spec.ts`
+files. Twilio credentials are deliberately not bound to the E2E server, so the
+SMS adapter stays stubbed and the inbound-SMS webhook accepts unsigned
+requests — no paid provider call is ever made by the suite.
+
+User-Asset Write-Path Checklist (M31): the touched classes are all six —
+`people`, `endpoints`, `conversations`, `participants`, `messages`,
+`deliveries` — because the `/api/test/reset` route `DELETE`s and re-`INSERT`s
+every one of them. This is acceptable only because the route is provably
+unreachable in production: it 404s on the production hostname
+(`household-hub.pages.dev`), and 404s whenever the `TEST_ROUTES_SECRET`
+binding is absent — which it always is on production Pages, since that binding
+is set only by `scripts/e2e/start-server.mjs`. A wrong `x-test-secret` header
+yields 403. The gate is the route handler itself in
+`src/routes/api/test/reset/+server.ts`; its 403-on-wrong-secret behaviour is
+asserted by `e2e/api-webhook-auth.spec.ts`, and its correct operation is
+exercised by every spec's `beforeEach`. No new string set is introduced, so no
+parity test is needed; the existing post-deploy probes still cover all six
+classes (the route adds no new record class). No new try/catch wraps the
+write: the reset runs as one atomic `db.batch()`, and a failure throws to a
+500 (no silent fallback).
 
 ## Concrete Steps
 

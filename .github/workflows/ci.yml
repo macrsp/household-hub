@@ -31,3 +31,34 @@ jobs:
 
       - name: Unit tests
         run: npm run test:unit
+
+  e2e:
+    # End-to-end lane (M31): drives the real SvelteKit stack on
+    # `wrangler pages dev` over a local D1, exercising the API, the webhook
+    # auth gates, and the conversation UI with no request mocking.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
