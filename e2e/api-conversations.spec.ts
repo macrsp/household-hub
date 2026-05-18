@@ -155,6 +155,26 @@ test.describe('conversations API', () => {
 		expect(res.status()).toBe(404);
 	});
 
+	test('the AI title-suggestion endpoint responds without crashing (M59)', async ({
+		request
+	}) => {
+		await postMessage(request, { body: 'who is bringing snacks to the game?' });
+		const res = await request.get('/api/conversations/general/title-suggestion');
+		// The E2E server has no Workers AI auth, so the endpoint reports the
+		// suggestion unavailable (503) rather than erroring.
+		expect([200, 503]).toContain(res.status());
+		const data = await res.json();
+		expect(typeof data.available).toBe('boolean');
+		expect(typeof data.title).toBe('string');
+	});
+
+	test('the AI title-suggestion endpoint 404s for an unknown conversation (M59)', async ({
+		request
+	}) => {
+		const res = await request.get('/api/conversations/no-such-thread/title-suggestion');
+		expect(res.status()).toBe(404);
+	});
+
 	test('exports a conversation as a JSON download (M49)', async ({ request }) => {
 		await postMessage(request, { body: 'json export line' });
 
