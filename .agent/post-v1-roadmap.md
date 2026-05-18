@@ -233,6 +233,9 @@ when each is reached.
 - [ ] **M48 — Escape-to-cancel.** Pressing Escape closes whatever transient UI
   is open — the emoji picker, an open editor, a pending reply, the new- or
   manage-conversation panels, or a search result view.
+- [ ] **M49 — JSON conversation export.** The export route gains a
+  `?format=json` mode returning a structured JSON download alongside the
+  plain-text transcript; the Manage panel offers both.
 
 ## Surprises & Discoveries
 
@@ -1141,6 +1144,16 @@ of transient UI, most-transient first — the reaction picker, an open message
 editor, a pending reply, the new-conversation form, the manage-conversation
 panel, then a search result view. `e2e/ui-smoke.spec.ts` adds a case that
 Escape closes the new-conversation form.
+
+**M49 — JSON conversation export.** A read-only feature — no write path, so no
+Write-Path Checklist. `GET /api/conversations/[slug]/export` (M30) returned a
+plain-text transcript; M49 adds a `?format=json` mode that returns a structured
+JSON download — `{ conversation, exported_at, message_count, messages[] }`,
+each message carrying `created_at`, `author`, `source_transport`, `deleted`,
+`edited`, and `body` (null for a deleted message, so the transcript stays
+honest without exposing retracted text). Anything other than `format=json`
+keeps the existing text behaviour. The Manage panel offers "Export text" and
+"Export JSON" links. `e2e/api-conversations.spec.ts` adds a JSON-export case.
 
 ## Concrete Steps
 
