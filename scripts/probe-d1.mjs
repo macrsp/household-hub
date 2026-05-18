@@ -66,6 +66,12 @@ const PROBES = [
 			'SELECT count(*) AS n FROM deliveries ' +
 			'WHERE message_id NOT IN (SELECT id FROM messages) ' +
 			'OR endpoint_id NOT IN (SELECT id FROM endpoints)'
+	},
+	{
+		name: 'sms_consents — blank name or phone',
+		sql:
+			'SELECT count(*) AS n FROM sms_consents ' +
+			"WHERE name IS NULL OR name = '' OR phone IS NULL OR phone = ''"
 	}
 ];
 
