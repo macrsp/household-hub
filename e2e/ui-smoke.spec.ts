@@ -25,4 +25,11 @@ test.describe('conversation UI', () => {
 			page.getByRole('heading', { name: /Privacy Policy/, level: 1 })
 		).toBeVisible();
 	});
+
+	test('loads the SMS terms of service page', async ({ page }) => {
+		await page.goto('/sms-terms');
+		await expect(
+			page.getByRole('heading', { name: /SMS Messaging Terms of Service/, level: 1 })
+		).toBeVisible();
+	});
 });

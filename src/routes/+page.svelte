@@ -879,7 +879,9 @@
 		<p class="error" role="alert">{errorText}</p>
 	{/if}
 	<footer class="legal">
-		<a href="/privacy">Privacy &amp; SMS terms</a>
+		<a href="/privacy">Privacy Policy</a>
+		<span aria-hidden="true">·</span>
+		<a href="/sms-terms">SMS Terms</a>
 	</footer>
 </main>
 
