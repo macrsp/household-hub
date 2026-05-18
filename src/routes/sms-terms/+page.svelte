@@ -70,7 +70,7 @@
 
 	<h2>Carriers</h2>
 	<p>
-		Mobile carriers are not liable for delayed or undelivered messages.
+		Carriers are not liable for any delayed or undelivered messages.
 	</p>
 
 	<h2>Changes</h2>
