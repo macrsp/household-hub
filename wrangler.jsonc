@@ -22,7 +22,7 @@
 	// Public (non-secret) base URL of the deployed app — used to build the
 	// Twilio delivery-status callback URL in the SMS adapter.
 	"vars": {
-		"PUBLIC_APP_URL": "https://household-hub.pages.dev"
+		"PUBLIC_APP_URL": "https://household.practicepartner.app"
 	}
 
 	// TODO(queues): v1 fans messages out synchronously (see

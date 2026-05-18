@@ -41,7 +41,7 @@
 	<h2>How to opt in</h2>
 	<p>
 		A household member opts in by completing the consent form at
-		<a href="/sms-opt-in">household-hub.pages.dev/sms-opt-in</a>, where the member
+		<a href="/sms-opt-in">household.practicepartner.app/sms-opt-in</a>, where the member
 		provides their mobile number and explicitly agrees to receive the household's
 		messages by text. Only members of the one household are eligible; there is no
 		public sign-up, and no number is ever added without that member's consent.

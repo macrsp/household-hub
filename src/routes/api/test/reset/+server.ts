@@ -8,8 +8,8 @@ import { requireDb } from '$lib/server/platform';
 // suite calls it before each test so every test starts from a known database
 // state. It is gated three ways and must never be reachable in production:
 //
-//   1. Production hostname (`household-hub.pages.dev`) -> 404. The route looks
-//      like it does not exist on the deployed app.
+//   1. A production hostname -> 404. The route looks like it does not exist
+//      on the deployed app.
 //   2. No `TEST_ROUTES_SECRET` binding -> 404. Production Pages never sets
 //      this var, so the route is disabled there by construction; the local
 //      E2E server binds it explicitly (see scripts/e2e/start-server.mjs).
@@ -17,7 +17,7 @@ import { requireDb } from '$lib/server/platform';
 //
 // The fixture mirrors seed.sql — the same fixed-id rows — so tests can refer
 // to `person-matt`, `conv-general`, etc. by their literal ids.
-const PRODUCTION_HOSTNAME = 'household-hub.pages.dev';
+const PRODUCTION_HOSTNAMES = ['household-hub.pages.dev', 'household.practicepartner.app'];
 
 interface TestEnv {
 	TEST_ROUTES_SECRET?: string;
@@ -39,7 +39,7 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 	} catch {
 		hostname = '';
 	}
-	if (hostname === PRODUCTION_HOSTNAME) throw error(404, 'Not found');
+	if (PRODUCTION_HOSTNAMES.includes(hostname)) throw error(404, 'Not found');
 
 	// Gate 2: disabled unless the test-only binding is present.
 	const secret = (platform?.env as TestEnv | undefined)?.TEST_ROUTES_SECRET;

@@ -21,7 +21,7 @@ no additional rejection code beyond 30896.
 > text. Messages cover household coordination, reminders, plans, and logistics.
 > This is not marketing, promotional, or bulk messaging. Recipients are only
 > members of the one household; each member opts in individually through the
-> web consent form at https://household-hub.pages.dev/sms-opt-in. Registered
+> web consent form at https://household.practicepartner.app/sms-opt-in. Registered
 > under a Sole Proprietor Brand.
 
 ## Message flow — "How do end-users consent to receive messages?"
@@ -29,7 +29,7 @@ This field is the cause of error 30896 — it must name the opt-in URL, the
 privacy policy URL, and the terms of service URL explicitly.
 
 > End users opt in through a publicly accessible website consent form at
-> https://household-hub.pages.dev/sms-opt-in
+> https://household.practicepartner.app/sms-opt-in
 >
 > WHO opts in: members of one private household.
 > WHERE: the public web form above (no login or gate — a reviewer can open the
@@ -47,17 +47,17 @@ privacy policy URL, and the terms of service URL explicitly.
 > sold, or transferred. There is a single opt-in method (this web form); there
 > is no keyword opt-in.
 >
-> Privacy policy: https://household-hub.pages.dev/privacy
-> Terms of service: https://household-hub.pages.dev/sms-terms
+> Privacy policy: https://household.practicepartner.app/privacy
+> Terms of service: https://household.practicepartner.app/sms-terms
 
 ## Privacy policy URL
-`https://household-hub.pages.dev/privacy`
+`https://household.practicepartner.app/privacy`
 (Already includes the mobile-number non-sharing statement, message frequency,
 and the "Message and data rates may apply" disclosure that error 30896 asks
 for.)
 
 ## Terms of service URL
-`https://household-hub.pages.dev/sms-terms`
+`https://household.practicepartner.app/sms-terms`
 **Must NOT be the same URL as the privacy policy** — that duplication caused
 the "Terms and Conditions" rejection.
 
@@ -104,7 +104,7 @@ Leave **empty** — opt-in is via the web form, not a keyword.
 ---
 
 ## Notes
-- Brand website field: `https://household-hub.pages.dev` (it loads — verified).
+- Brand website field: `https://household.practicepartner.app` (it loads — verified).
 - The customer-support address is `help@practicepartner.app` — a branded
   address on the registered brand's domain, which reads as more consistent to
   reviewers than a Gmail address. (A Gmail address would not by itself fail a
