@@ -306,6 +306,10 @@ when each is reached.
   up, to-dos, suggest a reply, ask) fold from separate header buttons into one
   "✨ AI" dropdown menu, keeping the conversation header uncluttered as the AI
   feature set grows.
+- [x] **M68 — Semantic retrieval for Ask.** "Ask this conversation" (M62) now
+  feeds the model the messages most relevant to the question — retrieved from
+  anywhere in the conversation's history via Vectorize — alongside a recent
+  window, so it can answer about something discussed long ago.
 
 ## Surprises & Discoveries
 
@@ -1513,6 +1517,20 @@ The Ask panel previously relied on the old toggle button to close; it now
 carries its own ✕ and is in the Escape chain. No API or write-path change —
 `e2e/ui-smoke.spec.ts` covers the menu opening, listing the four actions, and
 closing on Escape.
+
+**M68 — Semantic retrieval for Ask.** The first feature to *consume* the M66
+embedding index rather than just populate it. "Ask this conversation" (M62)
+fed the model a flat recent window (last 60 messages); it now also retrieves
+the messages most semantically relevant to the question from anywhere in the
+conversation's history. `semantic-index.ts` gains `relevantMessageIds(env,
+conversationId, query, topK)` — embeds the question and queries Vectorize
+within the conversation's namespace, best-effort (returns `[]` when Vectorize
+is absent or on failure). The Ask route fetches a 30-message recent window plus
+the relevant-but-not-recent messages by id, merges them chronologically, and
+prompts the model with the union. When Vectorize is unconfigured (local/CI) it
+degrades cleanly to just the recent window — the route's 503 gating is
+unchanged. `relevantMessageIds` is unit-covered with a stub Vectorize (matched
+ids in order, no-binding no-op, query-throw no-op). Read-only — no write path.
 
 ## Concrete Steps
 

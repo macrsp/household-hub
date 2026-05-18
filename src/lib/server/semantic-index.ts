@@ -63,3 +63,27 @@ export async function indexMessages(
 	await index.upsert(upserts);
 	return upserts.length;
 }
+
+// Retrieve the ids of up to `topK` messages most semantically relevant to
+// `query`, within one conversation's namespace (M68). Best-effort: returns []
+// when Workers AI or Vectorize is absent, or on failure — the caller then
+// falls back to a plain recent-message window.
+export async function relevantMessageIds(
+	env: App.Platform['env'],
+	conversationId: string,
+	query: string,
+	topK = 12
+): Promise<string[]> {
+	const ai = env.AI;
+	const index = env.VECTORIZE;
+	if (!ai || !index) return [];
+	try {
+		const vector = await embedText(ai, query);
+		if (!vector) return [];
+		const res = await index.query(vector, { topK, namespace: conversationId });
+		return (res.matches ?? []).map((m) => m.id);
+	} catch (e) {
+		console.error('[semantic] retrieval failed', e);
+		return [];
+	}
+}
