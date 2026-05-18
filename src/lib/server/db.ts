@@ -72,6 +72,98 @@ export async function insertSmsConsent(db: D1Database, c: SmsConsent): Promise<v
 		.run();
 }
 
+/**
+ * Create a household member and add them as a participant to every existing
+ * conversation, in one atomic D1 batch — so a new member can never exist
+ * outside the household's conversations. A runtime write path to `people` and
+ * `participants` (M40).
+ */
+export async function createPersonWithParticipants(
+	db: D1Database,
+	person: { id: string; display_name: string; created_at: string },
+	conversationIds: string[]
+): Promise<void> {
+	const statements = [
+		db
+			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
+			.bind(person.id, person.display_name, person.created_at),
+		...conversationIds.map((conversationId) =>
+			db
+				.prepare(
+					`INSERT OR IGNORE INTO participants
+					 (conversation_id, person_id, delivery_preference, muted)
+					 VALUES (?, ?, 'all', 0)`
+				)
+				.bind(conversationId, person.id)
+		)
+	];
+	await db.batch(statements);
+}
+
+/** Rename a household member (M40). */
+export async function updatePersonName(
+	db: D1Database,
+	personId: string,
+	displayName: string
+): Promise<void> {
+	await db
+		.prepare('UPDATE people SET display_name = ? WHERE id = ?')
+		.bind(displayName, personId)
+		.run();
+}
+
+/**
+ * Add one endpoint (an address on a transport) to a household member (M40).
+ * The schema's UNIQUE(type, address) constraint makes a duplicate throw — the
+ * route maps that to a 409.
+ */
+export async function insertEndpoint(
+	db: D1Database,
+	endpoint: {
+		id: string;
+		person_id: string;
+		type: EndpointType;
+		address: string;
+		created_at: string;
+	}
+): Promise<void> {
+	await db
+		.prepare(
+			`INSERT INTO endpoints (id, person_id, type, address, verified_at, created_at)
+			 VALUES (?, ?, ?, ?, NULL, ?)`
+		)
+		.bind(endpoint.id, endpoint.person_id, endpoint.type, endpoint.address, endpoint.created_at)
+		.run();
+}
+
+/** Every household member with their endpoints attached (M40). */
+export async function listPeopleWithEndpoints(
+	db: D1Database
+): Promise<
+	Array<{
+		id: string;
+		display_name: string;
+		created_at: string;
+		endpoints: Array<{ id: string; type: string; address: string }>;
+	}>
+> {
+	const { results: people } = await db
+		.prepare('SELECT id, display_name, created_at FROM people ORDER BY display_name')
+		.all<{ id: string; display_name: string; created_at: string }>();
+	const { results: endpoints } = await db
+		.prepare('SELECT id, person_id, type, address FROM endpoints ORDER BY type, address')
+		.all<{ id: string; person_id: string; type: string; address: string }>();
+
+	const byPerson = new Map<string, Array<{ id: string; type: string; address: string }>>();
+	for (const e of endpoints) {
+		const list = byPerson.get(e.person_id);
+		const entry = { id: e.id, type: e.type, address: e.address };
+		if (list) list.push(entry);
+		else byPerson.set(e.person_id, [entry]);
+	}
+	return people.map((p) => ({ ...p, endpoints: byPerson.get(p.id) ?? [] }));
+}
+
 /** Insert one canonical message. */
 export async function insertMessage(db: D1Database, m: Message): Promise<void> {
 	await db

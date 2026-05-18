@@ -208,6 +208,9 @@ when each is reached.
 - [ ] **M39 — Branded support address.** The customer-support contact on
   `/sms-terms`, `/privacy`, and the A2P campaign doc moves from a Gmail
   address to `help@practicepartner.app`, on the registered brand's domain.
+- [ ] **M40 — Household member management.** A `/household` page lists members
+  and their endpoints and adds new ones; members and endpoints were seed-only
+  before. A new member joins every conversation automatically.
 
 ## Surprises & Discoveries
 
@@ -960,6 +963,40 @@ the registered brand's own domain. A2P reviewers visit the linked terms and
 privacy pages during vetting, and a branded-domain support address reads as
 more consistent with the brand than a Gmail address. Matt's household email
 endpoint in `seed.sql` is a different use of the address and is left unchanged.
+
+**M40 — Household member management.** `people` and `endpoints` were
+seed-only; M40 makes them runtime-manageable. No migration — the tables exist.
+`db.ts` gains `createPersonWithParticipants` (an atomic batch: insert the
+person and a participant row for every existing conversation, so a member
+never exists outside the household's threads — mirroring M18's conversation
+creation), `updatePersonName`, `insertEndpoint`, and `listPeopleWithEndpoints`.
+`GET /api/people` now returns each member with their endpoints attached;
+`POST /api/people` adds a member; `PATCH /api/people/[id]` renames one;
+`POST /api/people/[id]/endpoints` adds an endpoint, validating `type` against
+the declared `ENDPOINT_TYPES`, applying a light per-transport shape check, and
+rejecting a duplicate `(type, address)` with 409. A new `/household` page
+lists members and their endpoints with inline add/rename forms; the home-page
+footer links it.
+
+User-Asset Write-Path Checklist (M40): the touched classes are `people`,
+`endpoints`, and `participants`. The write paths are the typed helpers
+`createPersonWithParticipants`, `updatePersonName`, and `insertEndpoint` in
+`src/lib/server/db.ts`. The server gates are the route handlers under
+`src/routes/api/people/`: `POST /api/people` requires a non-empty
+`displayName`; `PATCH /api/people/[id]` requires a non-empty `displayName` and
+an existing person (404); `POST /api/people/[id]/endpoints` requires an
+existing person (404), a `type` in `ENDPOINT_TYPES`, a non-empty address that
+passes the per-transport shape check, and a non-duplicate `(type, address)`
+(409). `createPersonWithParticipants` runs as one `db.batch()`, so a member
+can never be left without participant rows — which is why no per-iteration
+try/catch is needed. The `type` string set is the existing single declaration
+`ENDPOINT_TYPES` in `db.ts`, already covered by the `fanout.test.ts` parity
+test against the schema CHECK — invariant 3 holds with no new declaration. The
+post-deploy probes for all three classes already exist in
+`scripts/probe-d1.mjs`; `e2e/api-people.spec.ts` is the real-auth round-trip
+(list with endpoints, add a member + post as them, 400 blank name, rename, 404
+unknown, add an endpoint, 400 bad type, 400 malformed email, 409 duplicate).
+No new try/catch wraps a user-asset write.
 
 ## Concrete Steps
 

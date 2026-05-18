@@ -1067,6 +1067,8 @@
 		<p class="error" role="alert">{errorText}</p>
 	{/if}
 	<footer class="legal">
+		<a href="/household">Household</a>
+		<span aria-hidden="true">·</span>
 		<a href="/privacy">Privacy Policy</a>
 		<span aria-hidden="true">·</span>
 		<a href="/sms-terms">SMS Terms</a>
