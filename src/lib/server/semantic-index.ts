@@ -6,7 +6,6 @@
 // to one thread (namespace) or run household-wide (no namespace).
 
 import { embedText, embedTexts } from './embeddings';
-import type { Message } from './db';
 
 // A message reduced to what the index needs.
 export interface IndexableMessage {
@@ -15,10 +14,15 @@ export interface IndexableMessage {
 	conversation_id: string;
 }
 
-// Index one message into Vectorize. Best-effort and self-gating: a no-op when
-// Workers AI or the Vectorize binding is absent (local/CI), or the body is
-// empty. Intended to run via `waitUntil` so it never delays a send.
-export async function indexMessage(env: App.Platform['env'], message: Message): Promise<void> {
+// Index one message into Vectorize, keyed by message id — so a fresh insert
+// and a re-index after an edit both upsert the same vector. Best-effort and
+// self-gating: a no-op when Workers AI or the Vectorize binding is absent
+// (local/CI), or the body is empty. Intended to run via `waitUntil` so it
+// never delays a send.
+export async function indexMessage(
+	env: App.Platform['env'],
+	message: IndexableMessage
+): Promise<void> {
 	const ai = env.AI;
 	const index = env.VECTORIZE;
 	if (!ai || !index) return;

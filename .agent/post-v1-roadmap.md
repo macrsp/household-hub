@@ -314,6 +314,9 @@ when each is reached.
   assistant (M55) now draws on the messages most relevant to the @claude
   mention from the whole conversation, via Vectorize, alongside its recent
   window — the same retrieval upgrade as M68, applied to the assistant.
+- [x] **M70 — Re-index a message on edit.** Editing a message now re-embeds it
+  and upserts the fresh vector to Vectorize, so semantic search keeps up with
+  the new text — closing the stale-vector TODO left by M66.
 
 ## Surprises & Discoveries
 
@@ -1498,8 +1501,8 @@ cross-conversation result list. Both `embeddings.ts` and `semantic-index.ts`
 are unit-covered with stub AI/Vectorize objects (batching, blank-body skip,
 no-binding no-op). The E2E lane strips the `vectorize` binding the same way it
 strips `ai` (`scripts/e2e/start-server.mjs`), so semantic search reports itself
-unavailable (503) in CI. Edited messages keep a stale vector for now —
-`TODO:` re-index on edit; deleted messages need no pruning (filtered at query).
+unavailable (503) in CI. Deleted messages need no index pruning (filtered at
+query); edited messages are re-indexed by M70.
 
 Write-Path note (M66): the messages POST route gains a best-effort
 `indexMessage` side-effect, fired through `waitUntil` after the response. This
@@ -1547,6 +1550,18 @@ it is already in the recent window. Best-effort: with no Vectorize binding the
 retrieval returns `[]` and the assistant falls back to exactly its prior
 recent-window behaviour. The `messages` write path (the assistant's
 `person-claude` reply) is unchanged — the M55 Write-Path note still holds.
+
+**M70 — Re-index a message on edit.** Closes the stale-vector `TODO` from M66:
+a message edited after it was indexed kept its original embedding, so semantic
+search matched the old text. `indexMessage` is generalised from a full
+`Message` to the minimal `IndexableMessage` shape (`id`, `body`,
+`conversation_id`) — the messages POST route still satisfies it structurally —
+and the PATCH edit route now fires `indexMessage` with the new body via
+`waitUntil` after `editMessage`, upserting the same id so the vector is
+replaced in place. Best-effort and a no-op without Vectorize. Deleted messages
+still need no index work — they are filtered at query time against D1. No
+write-path change to `messages` itself; the re-index is the same derived-
+artifact side-effect as M66, covered by that Write-Path note.
 
 ## Concrete Steps
 

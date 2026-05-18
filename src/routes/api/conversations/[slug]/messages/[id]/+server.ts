@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
 import { softDeleteMessage, editMessage } from '$lib/server/db';
+import { indexMessage } from '$lib/server/semantic-index';
 
 // DELETE /api/conversations/[slug]/messages/[id] — soft-delete a message.
 // Body: { personId: string }. Only the message's own author may delete it.
@@ -60,13 +61,13 @@ export const PATCH: RequestHandler = async ({ platform, params, request }) => {
 	// The message must exist within this conversation (joined via the slug).
 	const message = await db
 		.prepare(
-			`SELECT m.author_person_id, m.deleted_at
+			`SELECT m.author_person_id, m.deleted_at, m.conversation_id
 			 FROM messages m
 			 JOIN conversations c ON c.id = m.conversation_id
 			 WHERE m.id = ? AND c.slug = ?`
 		)
 		.bind(params.id, params.slug)
-		.first<{ author_person_id: string; deleted_at: string | null }>();
+		.first<{ author_person_id: string; deleted_at: string | null; conversation_id: string }>();
 	if (!message) throw error(404, `Unknown message: ${params.id}`);
 
 	// Only the author may edit their own message — this gates the write.
@@ -79,5 +80,19 @@ export const PATCH: RequestHandler = async ({ platform, params, request }) => {
 	}
 
 	await editMessage(db, params.id, personId, body);
+
+	// Re-index the edited body for semantic search (M70) so the vector keeps
+	// up with the new text. Best-effort, after the response via waitUntil; a
+	// no-op when Workers AI or Vectorize is unconfigured.
+	{
+		const indexTask = indexMessage(platform!.env, {
+			id: params.id,
+			conversation_id: message.conversation_id,
+			body
+		});
+		if (platform?.context?.waitUntil) platform.context.waitUntil(indexTask);
+		else await indexTask;
+	}
+
 	return json({ id: params.id, body, edited: true });
 };
