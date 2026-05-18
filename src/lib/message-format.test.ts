@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { linkify, personHue, initial, dayKey, dayLabel, relativeTime } from './message-format';
+import {
+	linkify,
+	parseBody,
+	personHue,
+	initial,
+	dayKey,
+	dayLabel,
+	relativeTime
+} from './message-format';
 
 describe('linkify', () => {
 	it('returns one text segment for a body with no URL', () => {
@@ -47,6 +55,49 @@ describe('linkify', () => {
 			'https://a.test',
 			'https://b.test'
 		]);
+	});
+});
+
+describe('parseBody', () => {
+	const names = ['matt', 'julie'];
+
+	it('marks an @mention of a known member', () => {
+		const segs = parseBody('hey @Matt look', names);
+		expect(segs).toEqual([
+			{ kind: 'text', value: 'hey ' },
+			{ kind: 'mention', value: '@Matt' },
+			{ kind: 'text', value: ' look' }
+		]);
+	});
+
+	it('matches a mention case-insensitively', () => {
+		const segs = parseBody('@JULIE @julie', names);
+		expect(segs.filter((s) => s.kind === 'mention')).toHaveLength(2);
+	});
+
+	it('leaves an @word that is not a member as plain text', () => {
+		const segs = parseBody('email @stranger now', names);
+		expect(segs.some((s) => s.kind === 'mention')).toBe(false);
+		expect(segs.map((s) => s.value).join('')).toBe('email @stranger now');
+	});
+
+	it('still detects links alongside mentions', () => {
+		const segs = parseBody('@matt see https://example.com', names);
+		expect(segs.some((s) => s.kind === 'mention')).toBe(true);
+		expect(segs.some((s) => s.kind === 'link')).toBe(true);
+	});
+
+	it('returns the whole body as text when there is nothing special', () => {
+		expect(parseBody('just talking', names)).toEqual([{ kind: 'text', value: 'just talking' }]);
+	});
+
+	it('preserves the full text across all segments', () => {
+		const body = 'hi @matt and @julie — https://x.test done';
+		expect(
+			parseBody(body, names)
+				.map((s) => s.value)
+				.join('')
+		).toBe(body);
 	});
 });
 

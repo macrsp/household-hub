@@ -43,6 +43,41 @@ export function linkify(text: string): LinkSegment[] {
 	return segments;
 }
 
+/** One run of a message body: plain text, a URL link, or an @mention. */
+export type BodySegment =
+	| { kind: 'text'; value: string }
+	| { kind: 'link'; value: string; href: string }
+	| { kind: 'mention'; value: string };
+
+/**
+ * Split a message body into text, link, and @mention segments (M46). URLs are
+ * detected by `linkify`; within each text run, `@name` is a mention when
+ * `name` (case-insensitive) is in `mentionNames`. An `@word` that matches no
+ * household member stays plain text. Every segment is bound as text or an
+ * attribute by the caller — never raw HTML — so a body cannot inject markup.
+ */
+export function parseBody(text: string, mentionNames: string[]): BodySegment[] {
+	const names = new Set(mentionNames.map((n) => n.toLowerCase()));
+	const out: BodySegment[] = [];
+	for (const seg of linkify(text)) {
+		if (seg.link) {
+			out.push({ kind: 'link', value: seg.value, href: seg.href });
+			continue;
+		}
+		const re = /@([A-Za-z0-9][A-Za-z0-9_-]*)/g;
+		let last = 0;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(seg.value)) !== null) {
+			if (!names.has(m[1].toLowerCase())) continue;
+			if (m.index > last) out.push({ kind: 'text', value: seg.value.slice(last, m.index) });
+			out.push({ kind: 'mention', value: m[0] });
+			last = m.index + m[0].length;
+		}
+		if (last < seg.value.length) out.push({ kind: 'text', value: seg.value.slice(last) });
+	}
+	return out;
+}
+
 /** A stable hue (0–359) derived from a key, so each person keeps one colour. */
 export function personHue(key: string): number {
 	let h = 0;

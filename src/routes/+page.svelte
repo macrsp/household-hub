@@ -2,7 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { DELIVERY_PREFERENCES } from '$lib/preferences';
 	import {
-		linkify,
+		parseBody,
 		personHue,
 		initial,
 		dayKey,
@@ -128,6 +128,8 @@
 	const shown = $derived(searchMode ? searchResults : messages);
 	// Pinned messages in the active conversation, oldest-first (M37).
 	const pinnedMessages = $derived(messages.filter((m) => m.pinned_at && !m.deleted_at));
+	// First names of household members, for @mention highlighting (M46).
+	const mentionNames = $derived(people.map((p) => p.display_name.trim().split(/\s+/)[0]));
 	// Conversations split by archived state (M27).
 	const activeConversations = $derived(conversations.filter((c) => !c.archived_at));
 	const archivedConversations = $derived(conversations.filter((c) => c.archived_at));
@@ -1114,7 +1116,7 @@
 								{/if}
 							</p>
 						{/if}
-						<p class="body">{#each linkify(message.body) as seg}{#if seg.link}<a href={seg.href} target="_blank" rel="noopener noreferrer">{seg.value}</a>{:else}{seg.value}{/if}{/each}</p>
+						<p class="body">{#each parseBody(message.body, mentionNames) as seg}{#if seg.kind === 'link'}<a href={seg.href} target="_blank" rel="noopener noreferrer">{seg.value}</a>{:else if seg.kind === 'mention'}<span class="mention">{seg.value}</span>{:else}{seg.value}{/if}{/each}</p>
 						{#if message.author_person_id === senderId && (message.delivery_total ?? 0) > 0}
 							<p class="receipt">
 								{#if (message.delivery_failed ?? 0) > 0}
@@ -1570,6 +1572,11 @@
 
 	.body a {
 		color: var(--accent);
+	}
+
+	.mention {
+		color: var(--accent);
+		font-weight: 600;
 	}
 
 	.receipt {
