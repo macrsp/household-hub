@@ -8,6 +8,12 @@
 import { nowIso } from './time';
 import type { DeliveryPreference } from '../preferences';
 import { REACTION_EMOJI } from '../reactions';
+import {
+	isEntityKind,
+	isFactSource,
+	type EntityKind,
+	type FactSource
+} from './memory-kinds';
 
 // Single source of truth for the transport string sets. The schema CHECK
 // constraints in migrations/0001_initial.sql mirror these — keep them in sync
@@ -579,4 +585,198 @@ export async function createConversationWithParticipants(
 		)
 	];
 	await db.batch(statements);
+}
+
+// --- Household memory graph (M71) ----------------------------------------
+//
+// The memory graph is two user-asset tables: `memory_entities` (nodes) and
+// `memory_facts` (edges/triples). These helpers are the only runtime write
+// path to them. The kind/source string sets are validated against
+// memory-kinds.ts — the single source of truth — so a value outside the
+// declared set is rejected here, not silently stored.
+
+export interface MemoryEntity {
+	id: string;
+	kind: EntityKind;
+	name: string;
+	person_id: string | null;
+	created_at: string;
+}
+
+export interface MemoryFact {
+	id: string;
+	subject_id: string;
+	predicate: string;
+	object_text: string | null;
+	object_entity_id: string | null;
+	valid_at: string | null;
+	confidence: number;
+	status: 'proposed' | 'confirmed';
+	source: FactSource;
+	source_message_id: string | null;
+	source_ref: string | null;
+	created_at: string;
+	confirmed_at: string | null;
+	confirmed_by: string | null;
+}
+
+/** Whether a household member has the 'adult' role — the memory gate. */
+export async function isAdult(db: D1Database, personId: string): Promise<boolean> {
+	const row = await db
+		.prepare('SELECT role FROM people WHERE id = ?')
+		.bind(personId)
+		.first<{ role: string }>();
+	return row?.role === 'adult';
+}
+
+/** Find a memory entity by name, case-insensitively, or null. */
+export async function findEntityByName(
+	db: D1Database,
+	name: string
+): Promise<MemoryEntity | null> {
+	return await db
+		.prepare('SELECT * FROM memory_entities WHERE lower(name) = lower(?)')
+		.bind(name.trim())
+		.first<MemoryEntity>();
+}
+
+/**
+ * Resolve an entity by name, creating it with the given kind if it does not
+ * exist yet. Rejects a kind outside ENTITY_KINDS. The graph is small and a
+ * household has one "Mia", so name is treated as the natural key.
+ */
+export async function upsertEntity(
+	db: D1Database,
+	entity: { kind: string; name: string; person_id?: string | null }
+): Promise<MemoryEntity> {
+	const name = entity.name.trim();
+	if (name === '') throw new Error('entity name is required');
+	if (!isEntityKind(entity.kind)) throw new Error(`unknown entity kind: ${entity.kind}`);
+	const existing = await findEntityByName(db, name);
+	if (existing) return existing;
+	const row: MemoryEntity = {
+		id: crypto.randomUUID(),
+		kind: entity.kind,
+		name,
+		person_id: entity.person_id ?? null,
+		created_at: nowIso()
+	};
+	await db
+		.prepare(
+			'INSERT INTO memory_entities (id, kind, name, person_id, created_at) VALUES (?, ?, ?, ?, ?)'
+		)
+		.bind(row.id, row.kind, row.name, row.person_id, row.created_at)
+		.run();
+	return row;
+}
+
+export interface NewFact {
+	subject_id: string;
+	predicate: string;
+	object_text?: string | null;
+	object_entity_id?: string | null;
+	valid_at?: string | null;
+	confidence: number;
+	status: 'proposed' | 'confirmed';
+	source: string;
+	source_message_id?: string | null;
+	source_ref?: string | null;
+}
+
+/**
+ * Insert a memory fact. The shape gate for the `memory_facts` write path:
+ * rejects a source outside FACT_SOURCES, an unknown status, an empty
+ * predicate, and — the table's core invariant — a fact whose object is not
+ * exactly one of a literal (object_text) or an entity (object_entity_id).
+ */
+export async function insertFact(db: D1Database, fact: NewFact): Promise<MemoryFact> {
+	if (!isFactSource(fact.source)) throw new Error(`unknown fact source: ${fact.source}`);
+	if (fact.status !== 'proposed' && fact.status !== 'confirmed') {
+		throw new Error(`unknown fact status: ${fact.status}`);
+	}
+	const predicate = fact.predicate.trim();
+	if (predicate === '') throw new Error('fact predicate is required');
+	const objectText = fact.object_text ?? null;
+	const objectEntityId = fact.object_entity_id ?? null;
+	if ((objectText === null) === (objectEntityId === null)) {
+		throw new Error('a fact must have exactly one of object_text / object_entity_id');
+	}
+	const now = nowIso();
+	const row: MemoryFact = {
+		id: crypto.randomUUID(),
+		subject_id: fact.subject_id,
+		predicate,
+		object_text: objectText,
+		object_entity_id: objectEntityId,
+		valid_at: fact.valid_at ?? null,
+		confidence: fact.confidence,
+		status: fact.status,
+		source: fact.source,
+		source_message_id: fact.source_message_id ?? null,
+		source_ref: fact.source_ref ?? null,
+		created_at: now,
+		confirmed_at: fact.status === 'confirmed' ? now : null,
+		confirmed_by: null
+	};
+	await db
+		.prepare(
+			`INSERT INTO memory_facts
+			 (id, subject_id, predicate, object_text, object_entity_id, valid_at, confidence,
+			  status, source, source_message_id, source_ref, created_at, confirmed_at, confirmed_by)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		)
+		.bind(
+			row.id,
+			row.subject_id,
+			row.predicate,
+			row.object_text,
+			row.object_entity_id,
+			row.valid_at,
+			row.confidence,
+			row.status,
+			row.source,
+			row.source_message_id,
+			row.source_ref,
+			row.created_at,
+			row.confirmed_at,
+			row.confirmed_by
+		)
+		.run();
+	return row;
+}
+
+/**
+ * Confirm a proposed fact: flip it to 'confirmed' and stamp who/when. The
+ * `status = 'proposed'` guard makes a repeat confirm a no-op. Returns true if
+ * exactly this call confirmed the fact.
+ */
+export async function confirmFact(
+	db: D1Database,
+	factId: string,
+	personId: string
+): Promise<boolean> {
+	const res = await db
+		.prepare(
+			`UPDATE memory_facts SET status = 'confirmed', confirmed_at = ?, confirmed_by = ?
+			 WHERE id = ? AND status = 'proposed'`
+		)
+		.bind(nowIso(), personId, factId)
+		.run();
+	return (res.meta.changes ?? 0) > 0;
+}
+
+/** The facts whose subject is `subjectId`, oldest-first. */
+export async function factsForSubject(
+	db: D1Database,
+	subjectId: string,
+	opts: { confirmedOnly?: boolean } = {}
+): Promise<MemoryFact[]> {
+	const clause = opts.confirmedOnly ? "AND status = 'confirmed'" : '';
+	const { results } = await db
+		.prepare(
+			`SELECT * FROM memory_facts WHERE subject_id = ? ${clause} ORDER BY created_at ASC`
+		)
+		.bind(subjectId)
+		.all<MemoryFact>();
+	return results;
 }

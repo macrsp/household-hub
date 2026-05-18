@@ -12,11 +12,13 @@ INSERT OR IGNORE INTO conversations (id, name, slug, created_at) VALUES
   ('conv-general', 'General', 'general', '2026-05-16T00:00:00.000Z'),
   ('conv-groceries', 'Groceries', 'groceries', '2026-05-16T00:00:00.000Z');
 
--- Three household members.
-INSERT OR IGNORE INTO people (id, display_name, created_at) VALUES
-  ('person-matt', 'Matt', '2026-05-16T00:00:00.000Z'),
-  ('person-two', 'Person Two', '2026-05-16T00:00:00.000Z'),
-  ('person-three', 'Person Three', '2026-05-16T00:00:00.000Z');
+-- Three household members. `role` is 'adult' for the two members trusted with
+-- the household memory graph and the Gmail connection (M71+), 'member' for
+-- everyone else.
+INSERT OR IGNORE INTO people (id, display_name, role, created_at) VALUES
+  ('person-matt', 'Matt', 'adult', '2026-05-16T00:00:00.000Z'),
+  ('person-two', 'Person Two', 'adult', '2026-05-16T00:00:00.000Z'),
+  ('person-three', 'Person Three', 'member', '2026-05-16T00:00:00.000Z');
 
 -- One SMS endpoint per person (fake +1555 01xx numbers — reserved for
 -- fiction; swap for real ones), plus real email endpoints for the household

@@ -58,6 +58,8 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		db.prepare('DELETE FROM push_subscriptions'),
 		db.prepare('DELETE FROM reactions'),
 		db.prepare('DELETE FROM sms_consents'),
+		db.prepare('DELETE FROM memory_facts'),
+		db.prepare('DELETE FROM memory_entities'),
 		db.prepare('DELETE FROM deliveries'),
 		db.prepare('DELETE FROM messages'),
 		db.prepare('DELETE FROM participants'),
@@ -65,17 +67,17 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		db.prepare('DELETE FROM conversations'),
 		db.prepare('DELETE FROM people'),
 		db
-			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
-			.bind('person-matt', 'Matt', t),
+			.prepare('INSERT INTO people (id, display_name, role, created_at) VALUES (?, ?, ?, ?)')
+			.bind('person-matt', 'Matt', 'adult', t),
 		db
-			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
-			.bind('person-two', 'Person Two', t),
+			.prepare('INSERT INTO people (id, display_name, role, created_at) VALUES (?, ?, ?, ?)')
+			.bind('person-two', 'Person Two', 'adult', t),
 		db
-			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
-			.bind('person-three', 'Person Three', t),
+			.prepare('INSERT INTO people (id, display_name, role, created_at) VALUES (?, ?, ?, ?)')
+			.bind('person-three', 'Person Three', 'member', t),
 		db
-			.prepare('INSERT INTO people (id, display_name, created_at) VALUES (?, ?, ?)')
-			.bind('person-claude', 'Claude Code', t),
+			.prepare('INSERT INTO people (id, display_name, role, created_at) VALUES (?, ?, ?, ?)')
+			.bind('person-claude', 'Claude Code', 'member', t),
 		db
 			.prepare(
 				'INSERT INTO endpoints (id, person_id, type, address, verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
