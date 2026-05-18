@@ -243,6 +243,11 @@ when each is reached.
   finished loading is no longer silently dropped — `send()` waits for the app
   to be ready, then completes; the Send button no longer dead-ends on the
   not-ready state.
+- [ ] **M52 — The `#claude` dev channel.** A built-in conversation where
+  members post change requests and Claude Code posts back. Migration `0011`
+  seeds a `person-claude` member and the `conv-claude` conversation; the
+  messages API gains a `?since=` cursor so an external runner can poll for new
+  requests.
 
 ## Surprises & Discoveries
 
@@ -1189,6 +1194,21 @@ longer dead-ends. `e2e/ui-smoke.spec.ts` adds a cold-open test that fills and
 sends immediately without waiting for readiness. The gap was discovered by the
 M50 test flake — a flaky test that turned out to point at a real user-facing
 bug.
+
+**M52 — The `#claude` dev channel.** The first of the AI-integration milestones.
+household-hub gets a built-in conversation, `#claude`, where members post
+requests for changes to the app and Claude Code posts back what it shipped.
+Migration `0011_dev_channel.sql` seeds a `person-claude` household member
+("Claude Code") — the author of the runner's responses — and the `conv-claude`
+conversation (slug `claude`), with every existing member joined. The messages
+API gains a third filter mode, `?since=<ISO>` (`created_at > ?`), so the
+external runner can poll the channel for requests newer than its cursor. The
+`/api/test/reset` fixture seeds the channel too. No new runtime write path —
+the runner reads and posts through the existing messages API (a household
+member, `person-claude`, like any other) — so no Write-Path Checklist; the
+existing `people`/`conversations`/`participants` probes cover the seeded rows.
+`e2e/api-dev-channel.spec.ts` covers the channel's existence, a request +
+Claude reply, and the `?since=` cursor.
 
 ## Concrete Steps
 
