@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { DELIVERY_PREFERENCES } from '$lib/preferences';
+	import { linkify, personHue, initial, dayKey, dayLabel } from '$lib/message-format';
 
 	interface Person {
 		id: string;
@@ -573,38 +574,6 @@
 		}
 	}
 
-	// Split a message body into plain-text and link segments so URLs render as
-	// clickable links. Each segment is later bound as a text node or an <a>
-	// attribute — never {@html} — so a message body can never inject markup.
-	function linkify(text: string): Array<{ link: boolean; value: string; href: string }> {
-		const segments: Array<{ link: boolean; value: string; href: string }> = [];
-		const re = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
-		let last = 0;
-		let m: RegExpExecArray | null;
-		while ((m = re.exec(text)) !== null) {
-			if (m.index > last) {
-				segments.push({ link: false, value: text.slice(last, m.index), href: '' });
-			}
-			let url = m[0];
-			let trail = '';
-			// Trailing sentence punctuation is almost never part of the URL.
-			while (/[.,!?;:)\]]$/.test(url)) {
-				trail = url.slice(-1) + trail;
-				url = url.slice(0, -1);
-			}
-			if (url) {
-				const href = /^www\./i.test(url) ? `https://${url}` : url;
-				segments.push({ link: true, value: url, href });
-			}
-			if (trail) segments.push({ link: false, value: trail, href: '' });
-			last = m.index + m[0].length;
-		}
-		if (last < text.length) {
-			segments.push({ link: false, value: text.slice(last), href: '' });
-		}
-		return segments;
-	}
-
 	function formatTime(iso: string): string {
 		return new Date(iso).toLocaleString([], {
 			month: 'short',
@@ -612,33 +581,6 @@
 			hour: 'numeric',
 			minute: '2-digit'
 		});
-	}
-
-	// A stable hue (0–359) for a person, so each member keeps one colour.
-	function personHue(key: string): number {
-		let h = 0;
-		for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 360;
-		return h;
-	}
-
-	function initial(name: string): string {
-		return (name.trim()[0] ?? '?').toUpperCase();
-	}
-
-	// Day-divider helpers: dayKey groups messages by calendar day; dayLabel
-	// renders the divider text (Today / Yesterday / a weekday + date).
-	function dayKey(iso: string): string {
-		return new Date(iso).toDateString();
-	}
-
-	function dayLabel(iso: string): string {
-		const d = new Date(iso);
-		const today = new Date();
-		const yesterday = new Date();
-		yesterday.setDate(today.getDate() - 1);
-		if (d.toDateString() === today.toDateString()) return 'Today';
-		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-		return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
 	}
 
 	onMount(() => {
