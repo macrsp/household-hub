@@ -104,6 +104,9 @@
 	let replySuggestions = $state<string[]>([]);
 	let suggestionsError = $state('');
 	let suggestionsLoading = $state(false);
+	// AI compose-assist (M58): polishing the current draft.
+	let polishing = $state(false);
+	let polishError = $state('');
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Member ids selected for a new conversation (M47) — defaults to everyone.
@@ -489,6 +492,34 @@
 	function dismissSuggestions() {
 		replySuggestions = [];
 		suggestionsError = '';
+	}
+
+	// AI compose-assist (M58): rewrite the current draft more clearly.
+	async function polishDraft() {
+		const text = draft.trim();
+		if (text === '' || polishing) return;
+		polishError = '';
+		polishing = true;
+		try {
+			const res = await fetch('/api/assist/rewrite', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ text })
+			});
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; text?: string }
+				| null;
+			if (res.ok && data?.available && data.text) {
+				draft = data.text;
+				saveDraft(activeSlug);
+			} else {
+				polishError = 'Couldn’t polish that right now.';
+			}
+		} catch {
+			polishError = 'Could not reach the assistant — network error.';
+		} finally {
+			polishing = false;
+		}
 	}
 
 	// Jump to the conversation a global search result belongs to.
@@ -1527,12 +1558,25 @@
 			oninput={() => saveDraft(activeSlug)}
 			autocomplete="off"
 		/>
+		<button
+			type="button"
+			class="polish-btn"
+			onclick={polishDraft}
+			disabled={polishing || draft.trim() === ''}
+			title="Polish this draft with AI"
+			aria-label="Polish this draft with AI"
+		>
+			{polishing ? '…' : '✨'}
+		</button>
 		<button type="submit" disabled={sending || draft.trim() === ''}>
 			{sending ? 'Sending…' : 'Send'}
 		</button>
 	</form>
 	{#if errorText}
 		<p class="error" role="alert">{errorText}</p>
+	{/if}
+	{#if polishError}
+		<p class="error" role="alert">{polishError}</p>
 	{/if}
 	<footer class="legal">
 		<a href="/household">Household</a>
@@ -2221,6 +2265,16 @@
 		color: var(--dim);
 		font-size: 0.8rem;
 		cursor: pointer;
+	}
+
+	.polish-btn {
+		flex: none;
+		padding: 0.5rem 0.6rem;
+	}
+
+	.polish-btn:disabled {
+		color: var(--faint);
+		cursor: default;
 	}
 
 	select,
