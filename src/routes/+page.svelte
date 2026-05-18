@@ -100,6 +100,10 @@
 	let actionsError = $state('');
 	let actionsLoading = $state(false);
 	let actionsShown = $state(false);
+	// AI smart reply suggestions for the active conversation (M57).
+	let replySuggestions = $state<string[]>([]);
+	let suggestionsError = $state('');
+	let suggestionsLoading = $state(false);
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Member ids selected for a new conversation (M47) — defaults to everyone.
@@ -316,6 +320,7 @@
 		clearSearch();
 		dismissSummary();
 		dismissActions();
+		dismissSuggestions();
 		atBottom = true;
 		openStream();
 		loadPrefs();
@@ -450,6 +455,40 @@
 		actionItems = [];
 		actionsError = '';
 		actionsShown = false;
+	}
+
+	// AI reply suggestions (M57): draft a few short replies for the reader.
+	async function loadSuggestions() {
+		replySuggestions = [];
+		suggestionsError = '';
+		suggestionsLoading = true;
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/suggestions`);
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; suggestions?: string[] }
+				| null;
+			if (res.ok && data?.available && data.suggestions?.length) {
+				replySuggestions = data.suggestions;
+			} else {
+				suggestionsError = 'No reply suggestions right now.';
+			}
+		} catch {
+			suggestionsError = 'Could not load suggestions — network error.';
+		} finally {
+			suggestionsLoading = false;
+		}
+	}
+
+	// Drop a chosen suggestion into the composer, leaving it editable.
+	function useSuggestion(text: string) {
+		draft = text;
+		saveDraft(activeSlug);
+		dismissSuggestions();
+	}
+
+	function dismissSuggestions() {
+		replySuggestions = [];
+		suggestionsError = '';
 	}
 
 	// Jump to the conversation a global search result belongs to.
@@ -747,6 +786,7 @@
 			draft = '';
 			saveDraft(activeSlug);
 			replyingTo = '';
+			dismissSuggestions();
 		} catch {
 			errorText = 'Could not send — network error.';
 		} finally {
@@ -1048,6 +1088,14 @@
 					disabled={actionsLoading}
 				>
 					{actionsLoading ? 'Finding to-dos…' : '✅ To-dos'}
+				</button>
+				<button
+					type="button"
+					class="conv-tab conv-summary"
+					onclick={loadSuggestions}
+					disabled={suggestionsLoading}
+				>
+					{suggestionsLoading ? 'Thinking…' : '💬 Suggest a reply'}
 				</button>
 			{/if}
 			{#if archivedConversations.length > 0}
@@ -1424,6 +1472,33 @@
 				{/if}
 			</span>
 			<button type="button" class="reply-cancel" onclick={cancelReply} aria-label="Cancel reply">
+				✕
+			</button>
+		</div>
+	{/if}
+
+	{#if replySuggestions.length > 0 || suggestionsError}
+		<div class="suggestions-row">
+			<span class="suggestions-icon" aria-hidden="true">💬</span>
+			{#if suggestionsError}
+				<span class="suggestions-empty">{suggestionsError}</span>
+			{:else}
+				{#each replySuggestions as suggestion}
+					<button
+						type="button"
+						class="suggestion-chip"
+						onclick={() => useSuggestion(suggestion)}
+					>
+						{suggestion}
+					</button>
+				{/each}
+			{/if}
+			<button
+				type="button"
+				class="suggestion-dismiss"
+				onclick={dismissSuggestions}
+				aria-label="Dismiss suggestions"
+			>
 				✕
 			</button>
 		</div>
@@ -2103,6 +2178,49 @@
 		gap: 0.5rem;
 		padding: 0.75rem 1.25rem;
 		border-top: 1px solid var(--border);
+	}
+
+	.suggestions-row {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		padding: 0.5rem 1.25rem 0;
+	}
+
+	.suggestions-icon {
+		flex: none;
+		font-size: 0.85rem;
+	}
+
+	.suggestions-empty {
+		font-size: 0.8rem;
+		color: var(--dim);
+	}
+
+	.suggestion-chip {
+		padding: 0.3rem 0.6rem;
+		font-size: 0.8rem;
+		border: 1px solid var(--accent);
+		border-radius: 1rem;
+		background: var(--raised);
+		color: var(--muted);
+		cursor: pointer;
+	}
+
+	.suggestion-chip:hover {
+		background: var(--accent);
+		color: #fff;
+	}
+
+	.suggestion-dismiss {
+		flex: none;
+		margin-left: auto;
+		border: none;
+		background: none;
+		color: var(--dim);
+		font-size: 0.8rem;
+		cursor: pointer;
 	}
 
 	select,
