@@ -236,6 +236,9 @@ when each is reached.
 - [ ] **M49 — JSON conversation export.** The export route gains a
   `?format=json` mode returning a structured JSON download alongside the
   plain-text transcript; the Manage panel offers both.
+- [ ] **M50 — Unread count in the tab title.** Messages that arrive from
+  others while the tab is backgrounded show as a `(N)` badge in the document
+  title, cleared when the tab is focused again.
 
 ## Surprises & Discoveries
 
@@ -1154,6 +1157,18 @@ each message carrying `created_at`, `author`, `source_transport`, `deleted`,
 honest without exposing retracted text). Anything other than `format=json`
 keeps the existing text behaviour. The Manage panel offers "Export text" and
 "Export JSON" links. `e2e/api-conversations.spec.ts` adds a JSON-export case.
+
+**M50 — Unread count in the tab title.** Presentation only — no API, database,
+or write path is touched, so no Write-Path Checklist. `+page.svelte` keeps an
+`unseenCount`: `addMessage` bumps it when a genuinely-new message (created
+after the stream opened) from someone other than the active sender arrives
+while `document.hidden`. The `<title>` is reactive — `(N) Household Hub` when
+`unseenCount > 0`, plain otherwise — and a `visibilitychange` listener resets
+the count to 0 when the tab is focused. While hardening the E2E for this, the
+`ui-smoke` "sends a message" test was found to be flaky: it clicked **Send**
+before `loadPeople()` had populated `senderId`, so the button was still
+`disabled`; the test now waits for the button to be enabled (CI's single retry
+had been masking the race).
 
 ## Concrete Steps
 

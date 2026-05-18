@@ -14,7 +14,11 @@ test.describe('conversation UI', () => {
 
 		const composer = page.getByPlaceholder(/Message #general/);
 		await composer.fill('hello from playwright');
-		await page.getByRole('button', { name: 'Send' }).click();
+		// Send stays disabled until loadPeople() populates the sender — wait
+		// for the app to be ready rather than racing it.
+		const sendButton = page.getByRole('button', { name: 'Send' });
+		await expect(sendButton).toBeEnabled();
+		await sendButton.click();
 
 		await expect(page.getByText('hello from playwright')).toBeVisible();
 	});

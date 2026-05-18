@@ -126,6 +126,9 @@
 	let pushSubscribed = $state(false);
 	let pushPublicKey = '';
 	let streamOpenedAt = '';
+	// Count of messages that arrived while the tab was backgrounded — shown in
+	// the document title and reset when the tab is focused (M50).
+	let unseenCount = $state(0);
 	// The list currently on screen — search results when searching, else live.
 	const shown = $derived(searchMode ? searchResults : messages);
 	// Pinned messages in the active conversation, oldest-first (M37).
@@ -224,6 +227,16 @@
 		// A new message in the thread on screen is read as it arrives.
 		markRead(activeSlug);
 		maybeNotify(message);
+		// Count genuinely-new messages from others that land while the tab is
+		// backgrounded, so the title can show an unread badge.
+		if (
+			typeof document !== 'undefined' &&
+			document.hidden &&
+			message.author_person_id !== senderId &&
+			message.created_at > streamOpenedAt
+		) {
+			unseenCount += 1;
+		}
 		tick().then(() => {
 			if (wasAtBottom) listEl?.scrollTo({ top: listEl?.scrollHeight ?? 0 });
 		});
@@ -853,16 +866,22 @@
 		openStream();
 		conversationsTimer = setInterval(loadConversations, CONVERSATIONS_REFRESH_MS);
 		clockTimer = setInterval(() => (nowTick = new Date()), 60_000);
+		// Clear the unread-title badge once the member looks at the tab again.
+		const onVisible = () => {
+			if (!document.hidden) unseenCount = 0;
+		};
+		document.addEventListener('visibilitychange', onVisible);
 		return () => {
 			stream?.close();
 			if (conversationsTimer) clearInterval(conversationsTimer);
 			if (clockTimer) clearInterval(clockTimer);
+			document.removeEventListener('visibilitychange', onVisible);
 		};
 	});
 </script>
 
 <svelte:head>
-	<title>Household Hub</title>
+	<title>{unseenCount > 0 ? `(${unseenCount}) Household Hub` : 'Household Hub'}</title>
 </svelte:head>
 
 <svelte:window onkeydown={onGlobalKeydown} />
