@@ -93,7 +93,7 @@
 	<h2>Contact</h2>
 	<p>
 		Questions, or requests to remove information, may be sent to
-		<a href="mailto:north0401@gmail.com">north0401@gmail.com</a>.
+		<a href="mailto:help@practicepartner.app">help@practicepartner.app</a>.
 	</p>
 
 	<hr />

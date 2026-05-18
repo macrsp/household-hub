@@ -55,7 +55,7 @@
 	<h2>Help</h2>
 	<p>
 		Reply <strong>HELP</strong> to any message for help, or email the operator at
-		<a href="mailto:north0401@gmail.com">north0401@gmail.com</a>. The HELP reply
+		<a href="mailto:help@practicepartner.app">help@practicepartner.app</a>. The HELP reply
 		identifies the program and points to STOP for opting out.
 	</p>
 
@@ -83,7 +83,7 @@
 	<h2>Contact</h2>
 	<p>
 		Questions about the SMS program may be sent to
-		<a href="mailto:north0401@gmail.com">north0401@gmail.com</a>.
+		<a href="mailto:help@practicepartner.app">help@practicepartner.app</a>.
 	</p>
 </main>
 

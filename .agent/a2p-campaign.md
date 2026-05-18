@@ -96,7 +96,7 @@ Leave **empty** — opt-in is via the web form, not a keyword.
 `HELP, INFO`
 
 ## Help message
-> household-hub: For help, email north0401@gmail.com. Message frequency
+> household-hub: For help, email help@practicepartner.app. Message frequency
 > varies. Msg & data rates may apply. Reply STOP to opt out.
 
 (Added the brand name and a support contact, which the guide requires.)
@@ -105,8 +105,10 @@ Leave **empty** — opt-in is via the web form, not a keyword.
 
 ## Notes
 - Brand website field: `https://household-hub.pages.dev` (it loads — verified).
-- A Gmail address is expected and fine for a Sole Proprietor brand; the
-  matching-domain rule applies only to corporate brands.
+- The customer-support address is `help@practicepartner.app` — a branded
+  address on the registered brand's domain, which reads as more consistent to
+  reviewers than a Gmail address. (A Gmail address would not by itself fail a
+  Sole Proprietor brand, but the branded address is the stronger choice.)
 - The use case (private household coordination) is in no forbidden category.
 - The `/sms-opt-in` form is public, so a hosted screenshot is not required —
   but attaching one does no harm.
