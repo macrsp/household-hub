@@ -6,6 +6,7 @@ import { fanoutMessage } from '$lib/server/fanout';
 import { notifyPushSubscribers } from '$lib/server/push';
 import { mentionsClaude, maybeAssistantReply } from '$lib/server/assistant';
 import { indexMessage } from '$lib/server/semantic-index';
+import { extractFacts } from '$lib/server/memory-extract';
 import { nowIso } from '$lib/server/time';
 
 // Resolve a conversation row id from its URL slug, or 404.
@@ -161,6 +162,19 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		const indexTask = indexMessage(platform!.env, message);
 		if (platform?.context?.waitUntil) platform.context.waitUntil(indexTask);
 		else await indexTask;
+	}
+
+	// Extract durable household facts from the message into the memory graph
+	// as proposed facts (M73). Best-effort, after the response via waitUntil;
+	// a no-op in the dev channel or when Workers AI is unconfigured.
+	{
+		const extractTask = extractFacts(
+			platform!.env,
+			{ id: conversationId, slug: params.slug },
+			message
+		);
+		if (platform?.context?.waitUntil) platform.context.waitUntil(extractTask);
+		else await extractTask;
 	}
 
 	// If the message @-mentions Claude, generate an assistant reply (M55).
