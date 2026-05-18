@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { DELIVERY_PREFERENCES } from '$lib/preferences';
-	import { linkify, personHue, initial, dayKey, dayLabel } from '$lib/message-format';
+	import {
+		linkify,
+		personHue,
+		initial,
+		dayKey,
+		dayLabel,
+		relativeTime
+	} from '$lib/message-format';
 	import { REACTION_EMOJI } from '$lib/reactions';
 
 	interface Person {
@@ -85,6 +92,9 @@
 	let reactionPickerFor = $state('');
 	// Replies (M42): the id of the message the composer is replying to, or ''.
 	let replyingTo = $state('');
+	// A clock that ticks once a minute so relative timestamps stay fresh (M44).
+	let nowTick = $state(new Date());
+	let clockTimer: ReturnType<typeof setInterval> | undefined;
 	let editingId = $state('');
 	let editDraft = $state('');
 	// Per-conversation last-viewed timestamps (slug -> ISO), mirrored from
@@ -787,9 +797,11 @@
 		loadConversations();
 		openStream();
 		conversationsTimer = setInterval(loadConversations, CONVERSATIONS_REFRESH_MS);
+		clockTimer = setInterval(() => (nowTick = new Date()), 60_000);
 		return () => {
 			stream?.close();
 			if (conversationsTimer) clearInterval(conversationsTimer);
+			if (clockTimer) clearInterval(clockTimer);
 		};
 	});
 </script>
@@ -1002,7 +1014,9 @@
 						{#if message.pinned_at && !message.deleted_at}
 							<span class="pinned-flag" title="pinned">📌</span>
 						{/if}
-						<span class="time">{formatTime(message.created_at)}</span>
+						<span class="time" title={formatTime(message.created_at)}>
+							{relativeTime(message.created_at, nowTick)}
+						</span>
 						{#if message.edited_at && !message.deleted_at}
 							<span class="edited" title="edited {formatTime(message.edited_at)}">(edited)</span>
 						{/if}

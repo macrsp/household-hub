@@ -219,6 +219,9 @@ when each is reached.
 - [ ] **M43 — Conversation participant management.** A conversation can have
   members added or removed; the Manage panel shows a member checklist, so a
   thread can hold a subset of the household rather than always everyone.
+- [ ] **M44 — Relative timestamps.** Each message shows a short relative time
+  ('now', '5m', '3h', '2d') that refreshes once a minute; the absolute time
+  remains on hover.
 
 ## Surprises & Discoveries
 
@@ -1066,6 +1069,16 @@ round-trip (list, remove + re-add, idempotent add, 400 unknown person, 404
 unknown conversation, 404 remove-non-participant, messaging still works after a
 removal). No new try/catch wraps a user-asset write — each helper is one
 statement.
+
+**M44 — Relative timestamps.** Presentation only — no API, database, or write
+path is touched, so no Write-Path Checklist. `$lib/message-format.ts` gains a
+pure `relativeTime(iso, now)` helper returning a short label ('now', '5m',
+'3h', '2d', or a 'Mon D' date beyond a week; a future timestamp from clock
+skew reads 'now'); `now` is a parameter so the buckets are deterministically
+testable, and `message-format.test.ts` adds six cases. `+page.svelte` shows
+`relativeTime` in each message's meta row with the absolute time kept as the
+`title` tooltip, and a once-a-minute `nowTick` interval keeps the labels
+fresh.
 
 ## Concrete Steps
 
