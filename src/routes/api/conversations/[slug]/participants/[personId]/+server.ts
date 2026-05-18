@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
-import { updateParticipantPrefs } from '$lib/server/db';
+import { updateParticipantPrefs, removeParticipant } from '$lib/server/db';
 import { DELIVERY_PREFERENCES, isDeliveryPreference, type DeliveryPreference } from '$lib/preferences';
 
 interface ParticipantRow {
@@ -66,4 +66,14 @@ export const PUT: RequestHandler = async ({ platform, params, request }) => {
 
 	await updateParticipantPrefs(db, row.conversation_id, row.person_id, prefs);
 	return json(view(await resolveParticipant(db, params.slug, params.personId)));
+};
+
+// DELETE — remove this participant from the conversation (M43). 404 if they
+// are not a participant. Fanout already iterates `participants`, so a removed
+// member simply stops receiving the conversation's messages.
+export const DELETE: RequestHandler = async ({ platform, params }) => {
+	const db = requireDb(platform);
+	const row = await resolveParticipant(db, params.slug, params.personId);
+	await removeParticipant(db, row.conversation_id, row.person_id);
+	return json({ ok: true });
 };
