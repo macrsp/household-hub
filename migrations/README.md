@@ -31,6 +31,7 @@ paths must follow the User-Asset Durability invariants.
 | `messages`      | Canonical messages (the conversation)      | runtime (all routes) |
 | `deliveries`    | One row per fanout attempt to one endpoint | runtime (fanout)     |
 | `sms_consents`  | Recorded SMS opt-in consents (audit trail) | runtime (`/api/sms-consent`) |
+| `reactions`     | Emoji reactions on messages                | runtime (reactions route) |
 
 ## Transport string sets — single source of truth
 
@@ -68,3 +69,5 @@ run at least one "this should always be zero" query per class:
 - `deliveries` — zero rows whose `message_id` is absent from `messages`, or
   whose `endpoint_id` is absent from `endpoints`.
 - `sms_consents` — zero rows with a NULL or empty `name` or `phone` (M34).
+- `reactions` — zero rows whose `message_id` is absent from `messages`, or
+  whose `person_id` is absent from `people` (M36).

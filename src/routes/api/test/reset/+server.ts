@@ -55,6 +55,7 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 	// Wipe every table, then re-insert the fixture in one atomic batch. The
 	// schema declares no foreign keys, so delete order does not matter.
 	await db.batch([
+		db.prepare('DELETE FROM reactions'),
 		db.prepare('DELETE FROM sms_consents'),
 		db.prepare('DELETE FROM deliveries'),
 		db.prepare('DELETE FROM messages'),

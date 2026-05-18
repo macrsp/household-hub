@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { DELIVERY_PREFERENCES } from '$lib/preferences';
 	import { linkify, personHue, initial, dayKey, dayLabel } from '$lib/message-format';
+	import { REACTION_EMOJI } from '$lib/reactions';
 
 	interface Person {
 		id: string;
@@ -34,6 +35,8 @@
 		// Editing (M24): set once the author edits the message; the view shows
 		// an "(edited)" marker next to the timestamp.
 		edited_at?: string | null;
+		// Reactions (M36): per-emoji tallies, who reacted with each.
+		reactions?: Array<{ emoji: string; count: number; people: string[] }>;
 	}
 	interface Prefs {
 		muted: boolean;
@@ -72,6 +75,8 @@
 	let theme = $state<'auto' | 'light' | 'dark'>('auto');
 	// Inline message editing (M24): the id of the message being edited (or '')
 	// and the working copy of its text.
+	// Reactions (M36): the id of the message whose emoji picker is open, or ''.
+	let reactionPickerFor = $state('');
 	let editingId = $state('');
 	let editDraft = $state('');
 	// Per-conversation last-viewed timestamps (slug -> ISO), mirrored from
@@ -566,6 +571,45 @@
 		}
 	}
 
+	// Reactions (M36): toggle the active sender's emoji reaction on a message.
+	// The list is updated optimistically; the SSE stream re-emits the message
+	// (its change marker includes a reaction signature) to reconcile.
+	async function toggleReaction(message: Message, emoji: string) {
+		if (senderId === '') return;
+		reactionPickerFor = '';
+		messages = messages.map((m) => {
+			if (m.id !== message.id) return m;
+			const reactions = (m.reactions ?? []).map((r) => ({ ...r, people: [...r.people] }));
+			const existing = reactions.find((r) => r.emoji === emoji);
+			if (existing) {
+				existing.people = existing.people.includes(senderId)
+					? existing.people.filter((p) => p !== senderId)
+					: [...existing.people, senderId];
+				existing.count = existing.people.length;
+			} else {
+				reactions.push({ emoji, count: 1, people: [senderId] });
+			}
+			return { ...m, reactions: reactions.filter((r) => r.count > 0) };
+		});
+		try {
+			const res = await fetch(
+				`/api/conversations/${activeSlug}/messages/${message.id}/reactions`,
+				{
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ personId: senderId, emoji })
+				}
+			);
+			if (!res.ok) errorText = `Could not react (HTTP ${res.status}).`;
+		} catch {
+			errorText = 'Could not react — network error.';
+		}
+	}
+
+	function toggleReactionPicker(messageId: string) {
+		reactionPickerFor = reactionPickerFor === messageId ? '' : messageId;
+	}
+
 	function onKeydown(event: KeyboardEvent) {
 		// Enter sends; Shift+Enter is a newline.
 		if (event.key === 'Enter' && !event.shiftKey) {
@@ -807,6 +851,36 @@
 								{/if}
 							</p>
 						{/if}
+						<div class="reactions">
+							{#each message.reactions ?? [] as r (r.emoji)}
+								<button
+									type="button"
+									class="reaction-chip"
+									class:mine={r.people.includes(senderId)}
+									onclick={() => toggleReaction(message, r.emoji)}
+								>
+									{r.emoji}
+									{r.count}
+								</button>
+							{/each}
+							<button
+								type="button"
+								class="reaction-add"
+								title="Add a reaction"
+								onclick={() => toggleReactionPicker(message.id)}
+							>
+								+
+							</button>
+							{#if reactionPickerFor === message.id}
+								<span class="reaction-picker">
+									{#each REACTION_EMOJI as emoji (emoji)}
+										<button type="button" onclick={() => toggleReaction(message, emoji)}>
+											{emoji}
+										</button>
+									{/each}
+								</span>
+							{/if}
+						</div>
 						{#if message.author_person_id === senderId}
 							<div class="msg-actions">
 								<button type="button" class="action-btn" onclick={() => startEdit(message)}>
@@ -1156,6 +1230,61 @@
 		border-radius: 0.3rem;
 		background: var(--surface);
 		color: var(--dim);
+		cursor: pointer;
+	}
+
+	.reactions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3rem;
+		margin-top: 0.35rem;
+	}
+
+	.reaction-chip {
+		font: inherit;
+		font-size: 0.72rem;
+		padding: 0.05rem 0.4rem;
+		border: 1px solid var(--border-strong);
+		border-radius: 999px;
+		background: var(--surface);
+		color: var(--muted);
+		cursor: pointer;
+	}
+
+	.reaction-chip.mine {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--on-accent);
+	}
+
+	.reaction-add {
+		font: inherit;
+		font-size: 0.72rem;
+		line-height: 1;
+		padding: 0.1rem 0.4rem;
+		border: 1px dashed var(--border-strong);
+		border-radius: 999px;
+		background: var(--surface);
+		color: var(--faint);
+		cursor: pointer;
+	}
+
+	.reaction-picker {
+		display: inline-flex;
+		gap: 0.15rem;
+		padding: 0.1rem 0.25rem;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: var(--raised);
+	}
+
+	.reaction-picker button {
+		font-size: 0.95rem;
+		line-height: 1;
+		padding: 0.1rem 0.2rem;
+		border: none;
+		background: none;
 		cursor: pointer;
 	}
 

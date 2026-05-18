@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
-import { insertMessage, type Message } from '$lib/server/db';
+import { insertMessage, loadReactions, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
 import { nowIso } from '$lib/server/time';
 
@@ -65,7 +65,16 @@ export const GET: RequestHandler = async ({ platform, params, url }) => {
 			 ORDER BY created_at ASC`
 		)
 		.bind(...binds)
-		.all();
+		.all<Record<string, unknown>>();
+
+	// Attach each message's reaction tallies (M36).
+	const reactions = await loadReactions(
+		db,
+		results.map((r) => r.id as string)
+	);
+	for (const row of results) {
+		row.reactions = reactions.get(row.id as string) ?? [];
+	}
 	return json(results);
 };
 

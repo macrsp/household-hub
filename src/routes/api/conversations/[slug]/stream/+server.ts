@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireDb } from '$lib/server/platform';
+import { loadReactions, type ReactionSummary } from '$lib/server/db';
 
 // How often the stream checks D1 for new messages. Server-side, so the client
 // holds one connection and does no polling of its own.
@@ -64,12 +65,24 @@ export const GET: RequestHandler = async ({ platform, params }) => {
 						.bind(conversationId)
 						.all<Record<string, unknown>>();
 
+					// Attach reaction tallies; their signature joins the change
+					// marker so adding or removing a reaction re-emits the row.
+					const reactions = await loadReactions(
+						db,
+						results.map((r) => r.id as string)
+					);
+
 					let emitted = 0;
 					for (const row of results) {
 						const id = row.id as string;
+						const rxns = reactions.get(id) ?? [];
+						row.reactions = rxns;
+						const rxnSig = rxns
+							.map((s: ReactionSummary) => s.emoji + s.people.slice().sort().join('+'))
+							.join(',');
 						const marker = `${(row.deleted_at as string | null) ?? ''}|${
 							(row.edited_at as string | null) ?? ''
-						}`;
+						}|${rxnSig}`;
 						if (seen.get(id) === marker) continue;
 						seen.set(id, marker);
 						controller.enqueue(encoder.encode(`data: ${JSON.stringify(row)}\n\n`));
