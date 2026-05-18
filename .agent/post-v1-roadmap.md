@@ -284,6 +284,10 @@ when each is reached.
   page summarises the last day's activity across every active conversation via
   Workers AI, grouped by conversation. Read-only and gated like the AI summary
   (M54).
+- [x] **M62 — Ask this conversation.** An "❓ Ask" panel answers a free-text
+  question about a conversation from its recent messages via Workers AI,
+  without posting anything into the thread. Read-only and gated like the AI
+  summary (M54).
 
 ## Surprises & Discoveries
 
@@ -1390,6 +1394,18 @@ spans all of them. Gating matches the summary: no Workers AI binding or a
 failed call is `503 { available: false }`; a quiet last day is a non-failure
 `200 { available: true, digest: '' }`. The Household page gains a "What's new"
 button that renders the digest. Read-only — no Write-Path Checklist entry.
+
+**M62 — Ask this conversation.** `POST /api/conversations/[slug]/ask` answers a
+free-text question about a single conversation from its last ~60 readable
+messages via `@cf/meta/llama-3.1-8b-instruct`. It is distinct from the @claude
+assistant (M55): the assistant posts a reply message into the conversation,
+whereas Ask is a private, ephemeral query that stores and posts nothing. It is
+a POST because it carries a question body. Gating matches the summary: an
+unknown conversation is a 404, an empty or over-long question is a 400, no
+Workers AI binding or a failed call is `503 { available: false }`. The UI adds
+an "❓ Ask" button that toggles a question form in the header; the answer
+renders in a dismissable bar at the top of the message list. Read-only — no
+Write-Path Checklist entry.
 
 ## Concrete Steps
 
