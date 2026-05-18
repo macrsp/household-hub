@@ -230,6 +230,9 @@ when each is reached.
 - [ ] **M47 — Conversation creation with a member picker.** The new-conversation
   form can choose which household members join, rather than always adding
   everyone; `POST /api/conversations` accepts an optional `personIds`.
+- [ ] **M48 — Escape-to-cancel.** Pressing Escape closes whatever transient UI
+  is open — the emoji picker, an open editor, a pending reply, the new- or
+  manage-conversation panels, or a search result view.
 
 ## Surprises & Discoveries
 
@@ -1130,6 +1133,14 @@ person. No new string set, so no parity test. The existing `conversations` and
 `participants` post-deploy probes still apply; `e2e/api-conversations.spec.ts`
 gains two cases (create with a chosen subset; 400 on an unknown personId). No
 new try/catch — the helper remains a single `db.batch()`.
+
+**M48 — Escape-to-cancel.** Presentation only — no API, database, or write path
+is touched, so no Write-Path Checklist. `+page.svelte` adds an
+`onGlobalKeydown` handler on `<svelte:window>`: on Escape it closes one piece
+of transient UI, most-transient first — the reaction picker, an open message
+editor, a pending reply, the new-conversation form, the manage-conversation
+panel, then a search result view. `e2e/ui-smoke.spec.ts` adds a case that
+Escape closes the new-conversation form.
 
 ## Concrete Steps
 
