@@ -95,6 +95,11 @@
 	let summaryText = $state('');
 	let summaryError = $state('');
 	let summaryLoading = $state(false);
+	// AI-extracted action items / to-dos of the active conversation (M56).
+	let actionItems = $state<{ assignee: string; task: string }[]>([]);
+	let actionsError = $state('');
+	let actionsLoading = $state(false);
+	let actionsShown = $state(false);
 	let creatingConversation = $state(false);
 	let newConvName = $state('');
 	// Member ids selected for a new conversation (M47) — defaults to everyone.
@@ -310,6 +315,7 @@
 		noMoreOlder = false;
 		clearSearch();
 		dismissSummary();
+		dismissActions();
 		atBottom = true;
 		openStream();
 		loadPrefs();
@@ -414,6 +420,36 @@
 	function dismissSummary() {
 		summaryText = '';
 		summaryError = '';
+	}
+
+	// AI to-dos (M56): extract action items from the active thread.
+	async function loadActions() {
+		actionItems = [];
+		actionsError = '';
+		actionsShown = false;
+		actionsLoading = true;
+		try {
+			const res = await fetch(`/api/conversations/${activeSlug}/actions`);
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; actions?: { assignee: string; task: string }[] }
+				| null;
+			if (res.ok && data?.available) {
+				actionItems = data.actions ?? [];
+				actionsShown = true;
+			} else {
+				actionsError = 'To-dos aren’t available right now.';
+			}
+		} catch {
+			actionsError = 'Could not load to-dos — network error.';
+		} finally {
+			actionsLoading = false;
+		}
+	}
+
+	function dismissActions() {
+		actionItems = [];
+		actionsError = '';
+		actionsShown = false;
 	}
 
 	// Jump to the conversation a global search result belongs to.
@@ -1005,6 +1041,14 @@
 				>
 					{summaryLoading ? 'Summarizing…' : '✨ Catch me up'}
 				</button>
+				<button
+					type="button"
+					class="conv-tab conv-summary"
+					onclick={loadActions}
+					disabled={actionsLoading}
+				>
+					{actionsLoading ? 'Finding to-dos…' : '✅ To-dos'}
+				</button>
 			{/if}
 			{#if archivedConversations.length > 0}
 				<button
@@ -1134,6 +1178,34 @@
 					class="summary-dismiss"
 					onclick={dismissSummary}
 					aria-label="Dismiss summary"
+				>
+					✕
+				</button>
+			</div>
+		{/if}
+		{#if actionsShown || actionsError}
+			<div class="summary-bar">
+				<span class="summary-icon" aria-hidden="true">✅</span>
+				<div class="actions-body">
+					{#if actionsError}
+						<span class="summary-text">{actionsError}</span>
+					{:else if actionItems.length === 0}
+						<span class="summary-text">No to-dos found in this conversation.</span>
+					{:else}
+						<ul class="actions-list">
+							{#each actionItems as item}
+								<li>
+									{#if item.assignee}<strong>{item.assignee}:</strong> {/if}{item.task}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+				<button
+					type="button"
+					class="summary-dismiss"
+					onclick={dismissActions}
+					aria-label="Dismiss to-dos"
 				>
 					✕
 				</button>
@@ -1837,6 +1909,22 @@
 		min-width: 0;
 		color: var(--muted);
 		white-space: pre-wrap;
+	}
+
+	.actions-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.actions-list {
+		margin: 0;
+		padding-left: 1.1rem;
+		color: var(--muted);
+		font-size: 0.85rem;
+	}
+
+	.actions-list li {
+		margin: 0.15rem 0;
 	}
 
 	.summary-dismiss {

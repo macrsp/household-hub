@@ -243,22 +243,26 @@ when each is reached.
   finished loading is no longer silently dropped — `send()` waits for the app
   to be ready, then completes; the Send button no longer dead-ends on the
   not-ready state.
-- [ ] **M52 — The `#claude` dev channel.** A built-in conversation where
+- [x] **M52 — The `#claude` dev channel.** A built-in conversation where
   members post change requests and Claude Code posts back. Migration `0011`
   seeds a `person-claude` member and the `conv-claude` conversation; the
   messages API gains a `?since=` cursor so an external runner can poll for new
   requests.
-- [ ] **M53 — The dev-channel runner.** `scripts/claude-runner/run.mjs` polls
+- [x] **M53 — The dev-channel runner.** `scripts/claude-runner/run.mjs` polls
   `#claude` for new requests, runs Claude Code headless on each, and posts the
   result back into the channel. It runs on a cron on a host the operator
   controls (household-hub itself cannot run Claude Code).
-- [ ] **M54 — AI conversation summary.** A "✨ Catch me up" button summarises
+- [x] **M54 — AI conversation summary.** A "✨ Catch me up" button summarises
   a conversation's recent messages via Cloudflare Workers AI — no external API
   key, gated like the other adapters.
-- [ ] **M55 — In-app @claude assistant.** Mentioning `@claude` in an ordinary
+- [x] **M55 — In-app @claude assistant.** Mentioning `@claude` in an ordinary
   conversation gets a short Workers AI reply, posted back as the Claude Code
   member — distinct from the dev channel, and answering questions not code
   changes.
+- [x] **M56 — AI to-do extraction.** A "✅ To-dos" button extracts action
+  items — things someone agreed to or was asked to do — from a conversation's
+  recent messages via Workers AI, with an optional `[Name]` assignee. Read-only
+  and gated like the AI summary (M54).
 
 ## Surprises & Discoveries
 
@@ -1282,6 +1286,20 @@ durably stored before the assistant runs, and the assistant reply is a
 generated convenience, so logging and dropping a failed reply is the correct
 best-effort behaviour. No new string set; the existing `messages` probes
 cover the rows it inserts.
+
+**M56 — AI to-do extraction.** A read-only sibling of the M54 summary. The new
+`GET /api/conversations/[slug]/actions` route gathers the last ~40 readable
+messages, asks `@cf/meta/llama-3.1-8b-instruct` for a bulleted list of action
+items (with an optional `[Name]` assignee prefix), and returns structured
+`{ assignee, task }` rows. `src/lib/server/action-items.ts` holds the pure
+`parseActions` parser — the line-by-line bullet extraction — so it is unit-
+covered (`action-items.test.ts`, 6 cases) without importing a `+server.ts`
+(SvelteKit only permits HTTP-verb exports there). Gated exactly like the
+summary: an unknown conversation is a 404, no Workers AI binding or a failed
+model call is a `503 { available: false }`, an explicit model "NONE" reply is
+an empty list. The UI adds a "✅ To-dos" button beside "✨ Catch me up" that
+renders the items as a bulleted bar. No write path — read-only, so no
+Write-Path Checklist entry.
 
 ## Concrete Steps
 
