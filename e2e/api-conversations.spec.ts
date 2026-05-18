@@ -119,6 +119,20 @@ test.describe('conversations API', () => {
 		expect(res.status()).toBe(404);
 	});
 
+	test('the AI summary ?since= reports "all caught up" with no new messages (M64)', async ({
+		request
+	}) => {
+		await postMessage(request, { body: 'an older message' });
+		// A cursor in the future leaves nothing newer — answerable without AI.
+		const res = await request.get(
+			'/api/conversations/general/summary?since=2999-01-01T00:00:00.000Z'
+		);
+		expect(res.status()).toBe(200);
+		const data = await res.json();
+		expect(data.available).toBe(true);
+		expect(data.summary).toContain('caught up');
+	});
+
 	test('the AI to-dos endpoint responds without crashing (M56)', async ({ request }) => {
 		await postMessage(request, { body: 'someone should book the dentist' });
 		const res = await request.get('/api/conversations/general/actions');

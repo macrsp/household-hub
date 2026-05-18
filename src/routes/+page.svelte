@@ -96,6 +96,9 @@
 	let summaryText = $state('');
 	let summaryError = $state('');
 	let summaryLoading = $state(false);
+	// The active thread's last-viewed time, captured before markRead() moves
+	// it to "now" — so "Catch me up" can summarise only what was missed (M64).
+	let catchUpSince = $state('');
 	// AI-extracted action items / to-dos of the active conversation (M56).
 	let actionItems = $state<{ assignee: string; task: string }[]>([]);
 	let actionsError = $state('');
@@ -215,6 +218,7 @@
 					// localStorage unavailable — unread dots simply stay off
 				}
 			}
+			catchUpSince = readState[activeSlug] ?? '';
 			markRead(activeSlug);
 		} catch {
 			// transient
@@ -345,6 +349,7 @@
 		atBottom = true;
 		openStream();
 		loadPrefs();
+		catchUpSince = readState[slug] ?? '';
 		markRead(slug);
 		// The previous thread's draft was persisted on every keystroke; load
 		// the one belonging to the thread now being opened.
@@ -422,12 +427,14 @@
 	}
 
 	// AI summary (M54): fetch a "catch me up" summary of the active thread.
+	// When the thread had unread activity, scope it to what was missed (M64).
 	async function loadSummary() {
 		summaryText = '';
 		summaryError = '';
 		summaryLoading = true;
 		try {
-			const res = await fetch(`/api/conversations/${activeSlug}/summary`);
+			const qs = catchUpSince ? `?since=${encodeURIComponent(catchUpSince)}` : '';
+			const res = await fetch(`/api/conversations/${activeSlug}/summary${qs}`);
 			const data = (await res.json().catch(() => null)) as
 				| { available?: boolean; summary?: string }
 				| null;
