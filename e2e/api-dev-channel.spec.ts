@@ -32,6 +32,17 @@ test.describe('dev channel', () => {
 		expect(claudeReply.body).toBe('Shipped: dark-mode toggle.');
 	});
 
+	test('an @claude mention in a normal conversation posts cleanly (M55)', async ({ request }) => {
+		// The in-app assistant runs after the response via waitUntil and is a
+		// no-op without Workers AI (the E2E env has none) — the send itself
+		// must still succeed normally.
+		const res = await request.post('/api/conversations/general/messages', {
+			data: { authorPersonId: 'person-matt', body: '@claude what should we have for dinner?' }
+		});
+		expect(res.status(), await res.text()).toBe(201);
+		expect((await res.json()).body).toContain('@claude');
+	});
+
 	test('?since= returns only messages newer than the cursor', async ({ request }) => {
 		const first = await request.post('/api/conversations/claude/messages', {
 			data: { authorPersonId: 'person-matt', body: 'first request' }

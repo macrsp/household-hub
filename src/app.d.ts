@@ -31,6 +31,9 @@ declare global {
 				// in local/CI, where AI features report themselves unavailable.
 				AI?: Ai;
 			};
+			// The Cloudflare execution context — `waitUntil` keeps background
+			// work (e.g. the @claude assistant reply) alive past the response.
+			context?: { waitUntil(promise: Promise<unknown>): void };
 		}
 	}
 }

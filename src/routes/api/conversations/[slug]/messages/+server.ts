@@ -4,6 +4,7 @@ import { requireDb } from '$lib/server/platform';
 import { insertMessage, loadReactions, type Message } from '$lib/server/db';
 import { fanoutMessage } from '$lib/server/fanout';
 import { notifyPushSubscribers } from '$lib/server/push';
+import { mentionsClaude, maybeAssistantReply } from '$lib/server/assistant';
 import { nowIso } from '$lib/server/time';
 
 // Resolve a conversation row id from its URL slug, or 404.
@@ -150,6 +151,20 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
 		await notifyPushSubscribers(platform!.env, db, message.author_person_id);
 	} catch (e) {
 		console.error('[push] notify failed for message', message.id, e);
+	}
+
+	// If the message @-mentions Claude, generate an assistant reply (M55).
+	// Run it after the response via waitUntil so the send is never delayed; a
+	// no-op for non-mentions, the dev channel, or when Workers AI is unset.
+	if (mentionsClaude(message.body)) {
+		const replyTask = maybeAssistantReply(
+			platform!.env,
+			db,
+			{ id: conversationId, slug: params.slug },
+			message
+		);
+		if (platform?.context?.waitUntil) platform.context.waitUntil(replyTask);
+		else await replyTask;
 	}
 
 	// Return the message with its delivery counts — fanout has completed, so
