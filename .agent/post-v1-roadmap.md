@@ -267,6 +267,10 @@ when each is reached.
   drafts a few short replies from the conversation's recent messages via
   Workers AI; tapping a suggestion chip drops it into the composer, still
   editable. Read-only and gated like the AI summary (M54).
+- [x] **M58 — AI compose-assist.** A "✨" button in the composer rewrites the
+  current draft to be clearer and warmer via Workers AI, replacing the draft
+  text in place for the sender to review before sending. Stateless — writes
+  nothing — and gated like the AI summary (M54).
 
 ## Surprises & Discoveries
 
@@ -1318,6 +1322,20 @@ button; the results render as tappable chips above the composer, and tapping
 one drops the text into the draft (still editable) rather than sending it. The
 chip row clears on a thread switch and after a successful send. No write path —
 read-only, so no Write-Path Checklist entry.
+
+**M58 — AI compose-assist.** `POST /api/assist/rewrite` takes a draft message
+and asks `@cf/meta/llama-3.1-8b-instruct` to rewrite it clearer and warmer
+while preserving the meaning and any details. It is the first AI route that is
+not under `/api/conversations` — it carries no conversation context and writes
+nothing, so it lives under `/api/assist`. `src/lib/server/compose-assist.ts`
+holds the pure `cleanRewrite` helper (strips a chatty preamble line and
+wrapping quotes the model sometimes adds), unit-covered in
+`compose-assist.test.ts` (5 cases). It is a POST because it carries a body, but
+it is stateless — an empty or missing `text` is a 400, an over-long draft is a
+400, no Workers AI binding or a failed call is a `503 { available: false }`.
+The composer gains a "✨" button beside Send that replaces the draft text with
+the rewrite in place; `e2e/api-assist.spec.ts` covers the route. No database
+write — no Write-Path Checklist entry.
 
 ## Concrete Steps
 
