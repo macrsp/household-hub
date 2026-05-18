@@ -294,6 +294,9 @@ when each is reached.
 - [x] **M64 — Catch up on what you missed.** The summary route gains a
   `?since=` cursor; "✨ Catch me up" now passes the thread's last-viewed time so
   the summary covers only messages that arrived since the reader's last visit.
+- [x] **M65 — Threaded @claude assistant replies.** The in-app assistant
+  (M55) now posts its reply as a threaded reply to the message that mentioned
+  it, so the answer renders attached to the question instead of detached.
 
 ## Surprises & Discoveries
 
@@ -1445,6 +1448,16 @@ a per-conversation last-viewed time in `localStorage` (`hh-read-<slug>`);
 `selectConversation` and the initial load now capture that timestamp into
 `catchUpSince` *before* `markRead` advances it to "now", and `loadSummary`
 passes it as `?since=`. Read-only — no Write-Path Checklist entry.
+
+**M65 — Threaded @claude assistant replies.** A one-field correctness fix to
+M55: `maybeAssistantReply` now sets `reply_to_message_id` to the id of the
+message that mentioned Claude, so the generated reply threads under the
+question through the existing M42 reply rendering instead of appearing as a
+detached message. The mention's id is always a message in the same
+conversation, so it satisfies the same-conversation invariant the messages POST
+route enforces for user-supplied reply targets. Still authored as
+`person-claude` through the existing `insertMessage`/`fanoutMessage` path — the
+M55 Write-Path note still holds, no new write path.
 
 ## Concrete Steps
 

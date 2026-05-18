@@ -88,7 +88,10 @@ export async function maybeAssistantReply(
 			author_person_id: CLAUDE_PERSON_ID,
 			body: reply,
 			source_transport: 'app',
-			created_at: new Date().toISOString()
+			created_at: new Date().toISOString(),
+			// Thread the reply under the message that mentioned Claude, so it
+			// renders attached to the question (M42 reply rendering) — M65.
+			reply_to_message_id: message.id
 		};
 		await insertMessage(db, replyMessage);
 		await fanoutMessage(db, env, replyMessage.id);
