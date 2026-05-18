@@ -239,6 +239,10 @@ when each is reached.
 - [ ] **M50 — Unread count in the tab title.** Messages that arrive from
   others while the tab is backgrounded show as a `(N)` badge in the document
   title, cleared when the tab is focused again.
+- [ ] **M51 — Composer resilience.** A message sent before the roster has
+  finished loading is no longer silently dropped — `send()` waits for the app
+  to be ready, then completes; the Send button no longer dead-ends on the
+  not-ready state.
 
 ## Surprises & Discoveries
 
@@ -1169,6 +1173,22 @@ the count to 0 when the tab is focused. While hardening the E2E for this, the
 before `loadPeople()` had populated `senderId`, so the button was still
 `disabled`; the test now waits for the button to be enabled (CI's single retry
 had been masking the race).
+
+**M51 — Composer resilience.** A `+page.svelte` change — no API, database, or
+schema change, so no Write-Path Checklist; but it directly bears on PLANS.md
+User-Asset Durability invariant 1 ("no silent fallbacks on user-asset writes").
+Before M51, `send()` returned early — and the Send button stayed `disabled` —
+whenever `senderId` was still empty, which it is for a beat after the app
+opens while `loadPeople()` is in flight. A household member who opened the
+app, typed, and hit Send in that window had their message **silently dropped**
+with no feedback. M51 makes `send()` resilient: if `senderId` is empty it
+awaits `loadPeople()` first, then sends; only if the roster genuinely cannot
+load does it surface a clear "Still connecting" error (the draft is kept). The
+Send button's `disabled` condition drops the `senderId === ''` term, so it no
+longer dead-ends. `e2e/ui-smoke.spec.ts` adds a cold-open test that fills and
+sends immediately without waiting for readiness. The gap was discovered by the
+M50 test flake — a flaky test that turned out to point at a real user-facing
+bug.
 
 ## Concrete Steps
 
