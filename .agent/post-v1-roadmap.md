@@ -291,6 +291,9 @@ when each is reached.
 - [x] **M63 — Posted daily digest.** `POST /api/digest/post` generates the M61
   digest and posts it into a conversation as Claude Code, turning the on-demand
   digest into a proactive one a cron on the runner host can fire daily.
+- [x] **M64 — Catch up on what you missed.** The summary route gains a
+  `?since=` cursor; "✨ Catch me up" now passes the thread's last-viewed time so
+  the summary covers only messages that arrived since the reader's last visit.
 
 ## Surprises & Discoveries
 
@@ -1430,6 +1433,18 @@ write: the digest message itself is durably stored by `insertMessage` before
 fanout runs, and a fanout failure is logged with per-delivery rows recorded, so
 the canonical message is never lost. No new string set; the existing `messages`
 probes cover the row it inserts.
+
+**M64 — Catch up on what you missed.** The M54 summary always summarised the
+whole recent thread; this scopes "Catch me up" to what the reader actually
+missed. The summary route gains an optional `?since=<ISO>` that filters
+`m.created_at > ?`. The route is reordered so the empty result is answered
+before the Workers AI binding is checked — an empty window genuinely needs no
+model, so it returns `200 { available: true, summary: 'You're all caught up…' }`
+even when AI is unavailable, which also makes it E2E-testable. The client keeps
+a per-conversation last-viewed time in `localStorage` (`hh-read-<slug>`);
+`selectConversation` and the initial load now capture that timestamp into
+`catchUpSince` *before* `markRead` advances it to "now", and `loadSummary`
+passes it as `?since=`. Read-only — no Write-Path Checklist entry.
 
 ## Concrete Steps
 
