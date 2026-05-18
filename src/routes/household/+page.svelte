@@ -9,6 +9,7 @@
 	interface Person {
 		id: string;
 		display_name: string;
+		role: string;
 		endpoints: Endpoint[];
 	}
 
@@ -30,6 +31,17 @@
 	let digestError = $state('');
 	let digestLoading = $state(false);
 	let digestShown = $state(false);
+	// Household memory (M72): ask the knowledge graph a plain-language question.
+	// Adult-only, so the asker is chosen from the adult members.
+	let memoryPersonId = $state('');
+	let memoryQuestion = $state('');
+	let memoryAnswer = $state('');
+	let memoryError = $state('');
+	let memoryLoading = $state(false);
+	const adults = $derived(people.filter((p) => p.role === 'adult'));
+	$effect(() => {
+		if (memoryPersonId === '' && adults.length > 0) memoryPersonId = adults[0].id;
+	});
 
 	async function load() {
 		try {
@@ -139,6 +151,34 @@
 		}
 	}
 
+	// Household memory (M72): ask the knowledge graph a question.
+	async function askMemory() {
+		const question = memoryQuestion.trim();
+		if (question === '' || memoryPersonId === '' || memoryLoading) return;
+		memoryAnswer = '';
+		memoryError = '';
+		memoryLoading = true;
+		try {
+			const res = await fetch('/api/memory/ask', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ personId: memoryPersonId, question })
+			});
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; answer?: string }
+				| null;
+			if (res.ok && data?.available && data.answer) {
+				memoryAnswer = data.answer;
+			} else {
+				memoryError = 'The household memory could not answer that right now.';
+			}
+		} catch {
+			memoryError = 'Could not reach the household memory — network error.';
+		} finally {
+			memoryLoading = false;
+		}
+	}
+
 	onMount(load);
 </script>
 
@@ -170,6 +210,43 @@
 			</div>
 		{/if}
 	</section>
+
+	{#if adults.length > 0}
+		<section class="memory">
+			<h2 class="memory-title">🧠 Household memory</h2>
+			<p class="memory-hint">
+				Ask anything the household has saved — the wifi password, a teacher's
+				name, when the field trip is. Available to adult members.
+			</p>
+			<form
+				class="memory-ask"
+				onsubmit={(e) => {
+					e.preventDefault();
+					askMemory();
+				}}
+			>
+				<label class="memory-as">
+					<span class="sr-only">Ask as</span>
+					<select bind:value={memoryPersonId}>
+						{#each adults as adult (adult.id)}
+							<option value={adult.id}>{adult.display_name}</option>
+						{/each}
+					</select>
+				</label>
+				<input
+					type="text"
+					placeholder="What's the wifi password?"
+					bind:value={memoryQuestion}
+				/>
+				<button type="submit" disabled={memoryLoading || memoryQuestion.trim() === ''}>
+					{memoryLoading ? 'Asking…' : 'Ask'}
+				</button>
+			</form>
+			{#if memoryAnswer || memoryError}
+				<div class="memory-answer">{memoryError || memoryAnswer}</div>
+			{/if}
+		</section>
+	{/if}
 
 	<form
 		class="add-person"
@@ -328,6 +405,63 @@
 		border-radius: 0.5rem;
 		font-size: 0.88rem;
 		white-space: pre-wrap;
+	}
+
+	.memory {
+		margin: 1.25rem 0;
+		padding-top: 1rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.memory-title {
+		font-size: 1.05rem;
+		margin: 0 0 0.2rem;
+	}
+
+	.memory-hint {
+		color: var(--muted);
+		font-size: 0.82rem;
+		margin: 0 0 0.6rem;
+	}
+
+	.memory-ask {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.memory-ask input {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.9rem;
+	}
+
+	.memory-ask button {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--on-accent);
+	}
+
+	.memory-answer {
+		margin-top: 0.6rem;
+		padding: 0.7rem 0.8rem;
+		background: var(--raised, var(--surface));
+		border: 1px solid var(--accent);
+		border-radius: 0.5rem;
+		font-size: 0.88rem;
+		white-space: pre-wrap;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 
 	input,

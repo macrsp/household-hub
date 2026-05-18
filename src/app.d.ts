@@ -37,6 +37,9 @@ declare global {
 				// Present in production; absent in local/CI, where semantic
 				// search reports itself unavailable.
 				VECTORIZE?: VectorizeIndex;
+				// Cloudflare Vectorize index for household-memory fact recall
+				// (M72) — separate index, same gating.
+				VECTORIZE_FACTS?: VectorizeIndex;
 			};
 			// The Cloudflare execution context — `waitUntil` keeps background
 			// work (e.g. the @claude assistant reply) alive past the response.

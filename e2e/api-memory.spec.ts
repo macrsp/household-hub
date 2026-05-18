@@ -72,6 +72,39 @@ test.describe('household memory API', () => {
 		expect(res.status()).toBe(400);
 	});
 
+	test('the ask endpoint responds without crashing for an adult (M72)', async ({ request }) => {
+		await request.post('/api/memory/facts', {
+			data: {
+				personId: 'person-matt',
+				subject: 'the house',
+				subjectKind: 'place',
+				predicate: 'wifi_password',
+				object: 'hunter2'
+			}
+		});
+		const res = await request.post('/api/memory/ask', {
+			data: { personId: 'person-matt', question: 'what is the wifi password' }
+		});
+		// No Workers AI in the E2E env, so the answer is reported unavailable.
+		expect([200, 503]).toContain(res.status());
+		const data = await res.json();
+		expect(typeof data.available).toBe('boolean');
+	});
+
+	test('the ask endpoint refuses a non-adult with 403 (M72)', async ({ request }) => {
+		const res = await request.post('/api/memory/ask', {
+			data: { personId: 'person-three', question: 'anything' }
+		});
+		expect(res.status()).toBe(403);
+	});
+
+	test('the ask endpoint rejects an empty question with 400 (M72)', async ({ request }) => {
+		const res = await request.post('/api/memory/ask', {
+			data: { personId: 'person-matt', question: '  ' }
+		});
+		expect(res.status()).toBe(400);
+	});
+
 	test('the entities list is adult-gated and returns an array', async ({ request }) => {
 		await request.post('/api/memory/facts', {
 			data: {
