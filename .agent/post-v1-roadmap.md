@@ -190,6 +190,11 @@ when each is reached.
   `sms_consents` table. Clears the A2P 10DLC "Opt-in information" campaign
   rejection, whose root cause was a verbal-only consent narrative with no
   verifiable opt-in mechanism.
+- [ ] **M35 — A2P campaign compliance pass.** Cross-checks the household-hub
+  campaign against Twilio's A2P 10DLC onboarding guide and error 30896,
+  corrects the `/sms-terms` carrier-liability wording, and adds
+  `.agent/a2p-campaign.md` — the exact, field-by-field model campaign to enter
+  on resubmission.
 
 ## Surprises & Discoveries
 
@@ -812,6 +817,21 @@ real-auth round-trip (valid 201, missing/false `agreed` 400, blank name 400,
 short phone 400, plus the page flow). No new try/catch wraps the write —
 `insertSmsConsent` is one statement and a failure throws to a 500 (no silent
 fallback).
+
+**M35 — A2P campaign compliance pass.** No API, database, or write path is
+touched, so no Write-Path Checklist. The household-hub campaign was
+cross-checked field-by-field against Twilio's A2P 10DLC Campaign Onboarding
+Guide and the actual rejection error 30896 (Opt-in Error). One app fix: the
+`/sms-terms` carrier-liability sentence is corrected to the guide's verbatim
+wording, "Carriers are not liable for any delayed or undelivered messages."
+The rest of the work is `.agent/a2p-campaign.md` — a checked-in reference
+holding the exact, copy-paste-ready content for every campaign registration
+field (use case, description, message flow with all three URLs spelled out as
+error 30896 requires, sample messages with `[Name]` placeholders, and
+brand-named opt-in confirmation / opt-out / HELP messages with the frequency
+and rate disclosures the guide requires), plus a table of what changed since
+the rejected submission. The privacy policy already carried the non-sharing
+statement, frequency, and rate disclosures, so it needed no change.
 
 ## Concrete Steps
 
