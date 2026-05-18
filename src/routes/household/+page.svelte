@@ -25,6 +25,11 @@
 	let addEndpointFor = $state('');
 	let newEndpointType = $state('sms');
 	let newEndpointAddress = $state('');
+	// AI household digest (M61): a "what's new" summary across all conversations.
+	let digestText = $state('');
+	let digestError = $state('');
+	let digestLoading = $state(false);
+	let digestShown = $state(false);
 
 	async function load() {
 		try {
@@ -110,6 +115,30 @@
 		}
 	}
 
+	// AI digest (M61): summarise recent activity across every conversation.
+	async function loadDigest() {
+		digestText = '';
+		digestError = '';
+		digestShown = false;
+		digestLoading = true;
+		try {
+			const res = await fetch('/api/digest');
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; digest?: string }
+				| null;
+			if (res.ok && data?.available) {
+				digestText = data.digest ?? '';
+				digestShown = true;
+			} else {
+				digestError = 'A digest isn’t available right now.';
+			}
+		} catch {
+			digestError = 'Could not load a digest — network error.';
+		} finally {
+			digestLoading = false;
+		}
+	}
+
 	onMount(load);
 </script>
 
@@ -124,6 +153,23 @@
 		Add the members of your household and the addresses they receive messages at.
 		A new member joins every conversation automatically.
 	</p>
+
+	<section class="digest">
+		<button type="button" class="digest-btn" onclick={loadDigest} disabled={digestLoading}>
+			{digestLoading ? 'Summarizing…' : '📋 What’s new across the household'}
+		</button>
+		{#if digestShown || digestError}
+			<div class="digest-body">
+				{#if digestError}
+					{digestError}
+				{:else if digestText === ''}
+					Nothing new in the last day.
+				{:else}
+					{digestText}
+				{/if}
+			</div>
+		{/if}
+	</section>
 
 	<form
 		class="add-person"
@@ -262,6 +308,26 @@
 
 	.add-person {
 		margin: 1rem 0;
+	}
+
+	.digest {
+		margin: 1rem 0;
+	}
+
+	.digest-btn {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--on-accent);
+	}
+
+	.digest-body {
+		margin-top: 0.6rem;
+		padding: 0.7rem 0.8rem;
+		background: var(--raised, var(--surface));
+		border: 1px solid var(--accent);
+		border-radius: 0.5rem;
+		font-size: 0.88rem;
+		white-space: pre-wrap;
 	}
 
 	input,
