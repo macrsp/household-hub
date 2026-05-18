@@ -63,9 +63,10 @@ run at least one "this should always be zero" query per class:
 - `messages` — zero rows whose `author_person_id` is absent from `people`, or
   whose `conversation_id` is absent from `conversations`; zero rows whose
   `deleted_at` is earlier than `created_at` (a message cannot be retracted
-  before it was sent — M22 soft-deletion); and zero rows whose `edited_at` is
+  before it was sent — M22 soft-deletion); zero rows whose `edited_at` is
   earlier than `created_at` (a message cannot be edited before it was sent —
-  M24 editing).
+  M24 editing); and zero rows whose `pinned_at` is earlier than `created_at`
+  (a message cannot be pinned before it was sent — M37 pinning).
 - `deliveries` — zero rows whose `message_id` is absent from `messages`, or
   whose `endpoint_id` is absent from `endpoints`.
 - `sms_consents` — zero rows with a NULL or empty `name` or `phone` (M34).
