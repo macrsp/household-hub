@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { linkify, personHue, initial, dayKey, dayLabel } from './message-format';
+import { linkify, personHue, initial, dayKey, dayLabel, relativeTime } from './message-format';
 
 describe('linkify', () => {
 	it('returns one text segment for a body with no URL', () => {
@@ -117,6 +117,37 @@ describe('dayLabel', () => {
 		const label = dayLabel(new Date(2026, 4, 10, 12, 0, 0).toISOString(), now);
 		expect(label).not.toBe('Today');
 		expect(label).not.toBe('Yesterday');
+		expect(label.length).toBeGreaterThan(0);
+	});
+});
+
+describe('relativeTime', () => {
+	const now = new Date('2026-05-17T12:00:00.000Z');
+	const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+	it("reads a just-now timestamp as 'now'", () => {
+		expect(relativeTime(ago(5_000), now)).toBe('now');
+	});
+
+	it("reads a future timestamp (clock skew) as 'now'", () => {
+		expect(relativeTime(new Date(now.getTime() + 10_000).toISOString(), now)).toBe('now');
+	});
+
+	it('reads minutes within the hour', () => {
+		expect(relativeTime(ago(5 * 60_000), now)).toBe('5m');
+	});
+
+	it('reads hours within the day', () => {
+		expect(relativeTime(ago(3 * 60 * 60_000), now)).toBe('3h');
+	});
+
+	it('reads days within the week', () => {
+		expect(relativeTime(ago(2 * 24 * 60 * 60_000), now)).toBe('2d');
+	});
+
+	it('falls back to a calendar date beyond a week', () => {
+		const label = relativeTime(ago(20 * 24 * 60 * 60_000), now);
+		expect(label).not.toMatch(/^(now|\d+[mhd])$/);
 		expect(label.length).toBeGreaterThan(0);
 	});
 });
