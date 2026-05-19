@@ -8,9 +8,16 @@
 // requests go to the external Claude Code runner. The in-app assistant is for
 // every *other* conversation and answers questions, not code changes.
 
-import { insertMessage, upsertEntity, insertFact, type Message } from './db';
+import {
+	insertMessage,
+	upsertEntity,
+	insertFact,
+	confirmedFactsByIds,
+	type Message
+} from './db';
 import { fanoutMessage } from './fanout';
 import { relevantMessageIds } from './semantic-index';
+import { relevantFactIds } from './memory-index';
 
 const ASSISTANT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 const CLAUDE_PERSON_ID = 'person-claude';
@@ -145,6 +152,27 @@ export async function maybeAssistantReply(
 			.map((m) => `${m.author_name}: ${m.body}`)
 			.join('\n');
 
+		// Household memory (M82): pull the confirmed facts most relevant to the
+		// question, so @claude can answer about the household from anywhere —
+		// "what's the wifi password", "when is the field trip". Best-effort:
+		// empty without the facts index.
+		let factsBlock = '';
+		const factIds = await relevantFactIds(env, message.body, 8);
+		if (factIds.length > 0) {
+			const facts = await confirmedFactsByIds(db, factIds);
+			if (facts.length > 0) {
+				factsBlock =
+					'\n\nKnown household facts (use these if relevant):\n' +
+					facts
+						.map((f) => {
+							const object = f.object_text ?? f.object_name ?? '';
+							const when = f.valid_at ? ` (${f.valid_at})` : '';
+							return `- ${f.subject_name} ${f.predicate.replace(/_/g, ' ')}: ${object}${when}`;
+						})
+						.join('\n');
+			}
+		}
+
 		const result = (await ai.run(ASSISTANT_MODEL, {
 			messages: [
 				{
@@ -152,11 +180,12 @@ export async function maybeAssistantReply(
 					content:
 						'You are Claude, a friendly assistant in a family group chat. ' +
 						'Keep replies short, warm, and genuinely helpful. Answer the most ' +
-						'recent message. Do not invent household details you were not told.'
+						'recent message. Use the known household facts when they help; ' +
+						'do not invent household details you were not given.'
 				},
 				{
 					role: 'user',
-					content: `Recent conversation:\n${transcript}\n\nReply to the most recent message.`
+					content: `Recent conversation:\n${transcript}${factsBlock}\n\nReply to the most recent message.`
 				}
 			]
 		})) as { response?: string };
