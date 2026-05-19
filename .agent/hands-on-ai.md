@@ -40,11 +40,15 @@ text model and the M71–M79 memory graph.
   gated, raw image body, 6 MB cap, 503 without AI, image never stored); a
   "📷 Scan a flyer" file/camera control on the Household page. Gates green:
   check 486, unit 167, build, e2e api-memory 13.
-- [ ] M81 — Conversational meal planning: the in-app `@claude` assistant, when
-  a message asks to plan a meal, adds the ingredients to the shopping list
-  (`needs` facts) and names them in its reply.
+- [x] (2026-05-19 08:20Z) M81 — Conversational meal planning: `maybeAssistantReply`
+  now, on an `@claude` mention, also asks the model whether the message is a
+  meal/grocery request; `parseGroceryItems` (pure, unit-tested) cleans the
+  reply into items; each is written as a *confirmed* `needs` fact through
+  `insertFact` (per-item try/catch — PLANS.md invariant 2), and the assistant's
+  posted reply names what it added. Gates green: check 486, unit 172, build,
+  e2e api-dev-channel 4.
 
-No milestone is started yet.
+Both milestones complete and deployed — see Outcomes & Retrospective.
 
 
 ## Context and Orientation
@@ -209,4 +213,27 @@ None yet — M80 will record the Workers AI vision model's exact input shape
 
 ## Outcomes & Retrospective
 
-Pending.
+Delivered (M80–M81, merged, deployed, verified). The AI now acts on two
+real-world inputs. M80: an adult photographs a flyer and a Workers AI vision
+model (`@cf/meta/llama-3.2-11b-vision-instruct`) reads it; any event becomes a
+proposed memory fact that, once confirmed, lands on the M76 calendar. M81: a
+member writes `@claude let's have tacos` and the assistant adds the
+ingredients to the shopping list and says what it added.
+
+What went to plan: both features reused the M71–M79 foundation almost
+entirely — M80 reuses `parseExtractedFacts` (M78), the propose→confirm loop
+(M73), and the calendar (M76); M81 reuses the M55 assistant and the M76
+`needs` list. The new surface was small: one vision-model wrapper, one upload
+route, one extra model call in the assistant. Factoring `storeProposedFacts`
+out of `runExtraction` let the flyer path and the text path share the storing
+loop cleanly.
+
+The operator's design correction shaped M80: photographed flyers are not
+stored — the image is processed transiently and discarded, so no R2 bucket or
+attachments table was needed. The privacy posture matches Gmail ingestion
+(M75): raw input in, structured facts out, nothing raw retained.
+
+Nothing remains in this plan. A natural future follow-on: the vision model
+could read more than flyers (a receipt, a handwritten note), and meal planning
+could remember a household's recurring meals — both extensions of the same
+two routes, for a future plan.
