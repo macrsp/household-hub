@@ -920,3 +920,15 @@ export async function deleteGoogleAccount(
 		.run();
 	return (res.meta.changes ?? 0) > 0;
 }
+
+/**
+ * Whether any memory fact already carries this `source_ref` (e.g. a Gmail
+ * message id) — the M75 sync uses it to skip an email it has processed before.
+ */
+export async function factExistsForRef(db: D1Database, sourceRef: string): Promise<boolean> {
+	const row = await db
+		.prepare('SELECT 1 AS x FROM memory_facts WHERE source_ref = ? LIMIT 1')
+		.bind(sourceRef)
+		.first<{ x: number }>();
+	return row !== null;
+}

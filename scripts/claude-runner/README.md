@@ -68,6 +68,20 @@ If the `DIGEST_POST_SECRET` Cloudflare secret is set, the `X-Webhook-Secret`
 header must match it; if it is unset, the header is not required. A quiet day
 posts nothing.
 
+## Optional: the Gmail sync (M75)
+
+If household members have connected Gmail accounts (M74), the same host can
+sync them daily: it reads the last day's email from each connected account and
+proposes household-memory facts for an adult to review. Raw email is never
+stored.
+
+```cron
+0 6 * * * curl -fsS -X POST "$HOUSEHOLD_HUB_URL/api/google/sync" -H "X-Webhook-Secret: $GMAIL_SYNC_SECRET" >> /var/log/household-gmail-sync.log 2>&1
+```
+
+If the `GMAIL_SYNC_SECRET` Cloudflare secret is set, the `X-Webhook-Secret`
+header must match it; if it is unset, the header is not required.
+
 ## Guardrails
 
 - **Cost cap.** `MAX_REQUESTS` (default 1) limits requests per run. Also set a

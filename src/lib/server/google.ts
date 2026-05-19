@@ -9,6 +9,8 @@
 // (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, TOKEN_ENCRYPTION_KEY). Local and CI
 // have none, so the /api/google/* routes report Gmail unconfigured there.
 
+import type { GoogleAccountRow } from './db';
+
 type Env = App.Platform['env'];
 
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -206,4 +208,97 @@ export async function gmailProfile(
 	});
 	if (!res.ok) throw new Error(`Gmail profile request failed: ${res.status}`);
 	return (await res.json()) as { emailAddress: string; historyId: string };
+}
+
+// --- Token refresh + Gmail message reading (M75) -------------------------
+
+/**
+ * Return a usable access token for a connected account, refreshing it first
+ * if it is within a minute of expiry. A refresh re-encrypts and persists the
+ * new token. The plaintext token exists only in memory, for the caller's
+ * immediate Gmail request.
+ */
+export async function freshAccessToken(
+	env: Env,
+	db: D1Database,
+	account: GoogleAccountRow
+): Promise<string> {
+	const key = env.TOKEN_ENCRYPTION_KEY as string;
+	if (Date.parse(account.token_expiry) > Date.now() + 60_000) {
+		return decryptToken(key, account.access_token);
+	}
+	const refresh = await decryptToken(key, account.refresh_token);
+	const tokens = await refreshAccessToken(env, refresh);
+	const expiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+	await db
+		.prepare('UPDATE google_accounts SET access_token = ?, token_expiry = ? WHERE id = ?')
+		.bind(await encryptToken(key, tokens.access_token), expiry, account.id)
+		.run();
+	return tokens.access_token;
+}
+
+interface GmailPart {
+	mimeType?: string;
+	body?: { data?: string };
+	parts?: GmailPart[];
+}
+
+export interface GmailMessage {
+	id: string;
+	snippet?: string;
+	payload?: GmailPart & { headers?: Array<{ name: string; value: string }> };
+}
+
+/** The ids of messages received in the last day (the sync window). */
+export async function listRecentMessageIds(accessToken: string, max = 25): Promise<string[]> {
+	const url = `${GMAIL_BASE}/messages?q=${encodeURIComponent('newer_than:1d')}&maxResults=${max}`;
+	const res = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+	if (!res.ok) throw new Error(`Gmail messages.list failed: ${res.status}`);
+	const data = (await res.json()) as { messages?: Array<{ id: string }> };
+	return (data.messages ?? []).map((m) => m.id);
+}
+
+/** Fetch one full message. */
+export async function getMessage(accessToken: string, id: string): Promise<GmailMessage> {
+	const res = await fetch(`${GMAIL_BASE}/messages/${id}?format=full`, {
+		headers: { authorization: `Bearer ${accessToken}` }
+	});
+	if (!res.ok) throw new Error(`Gmail messages.get failed: ${res.status}`);
+	return (await res.json()) as GmailMessage;
+}
+
+function decodeB64Url(data: string): string {
+	const bin = atob(data.replace(/-/g, '+').replace(/_/g, '/'));
+	return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+function findPlainText(part: GmailPart | undefined): string {
+	if (!part) return '';
+	if (part.mimeType === 'text/plain' && part.body?.data) {
+		try {
+			return decodeB64Url(part.body.data);
+		} catch {
+			return '';
+		}
+	}
+	for (const child of part.parts ?? []) {
+		const found = findPlainText(child);
+		if (found) return found;
+	}
+	return '';
+}
+
+/**
+ * Render a Gmail message as plain text for fact extraction: the Subject line
+ * plus the plain-text body, or the short snippet when there is no plain-text
+ * part. The body is capped so the extraction prompt stays bounded. Pure —
+ * unit-tested.
+ */
+export function messageText(message: GmailMessage, maxBody = 4000): string {
+	const subject =
+		message.payload?.headers?.find((h) => h.name.toLowerCase() === 'subject')?.value ?? '';
+	let body = findPlainText(message.payload);
+	if (body.trim() === '') body = message.snippet ?? '';
+	body = body.trim().slice(0, maxBody);
+	return subject ? `Subject: ${subject}\n\n${body}` : body;
 }
