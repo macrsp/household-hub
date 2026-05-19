@@ -82,6 +82,22 @@ stored.
 If the `GMAIL_SYNC_SECRET` Cloudflare secret is set, the `X-Webhook-Secret`
 header must match it; if it is unset, the header is not required.
 
+## Optional: the changelog (M77)
+
+After a successful dev-channel build and deploy, post a plain-language note of
+what shipped into the `#claude` channel, so the household sees the app
+describe its own growth:
+
+```sh
+curl -fsS -X POST "$HOUSEHOLD_HUB_URL/api/changelog" \
+  -H "X-Webhook-Secret: $CHANGELOG_SECRET" \
+  -H 'content-type: application/json' \
+  --data '{"summary":"a one-line description of what shipped"}'
+```
+
+If the `CHANGELOG_SECRET` Cloudflare secret is set, the `X-Webhook-Secret`
+header must match it; if it is unset, the header is not required.
+
 ## Guardrails
 
 - **Cost cap.** `MAX_REQUESTS` (default 1) limits requests per run. Also set a

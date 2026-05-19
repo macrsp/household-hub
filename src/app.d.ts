@@ -37,6 +37,9 @@ declare global {
 				// Optional shared secret for the Gmail sync poster (M75). When
 				// set, POST /api/google/sync requires a matching X-Webhook-Secret.
 				GMAIL_SYNC_SECRET?: string;
+				// Optional shared secret for the changelog poster (M77). When
+				// set, POST /api/changelog requires a matching X-Webhook-Secret.
+				CHANGELOG_SECRET?: string;
 				// Public base URL of the deployed app (not a secret) — used to
 				// build the Twilio delivery-status callback URL.
 				PUBLIC_APP_URL?: string;

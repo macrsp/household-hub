@@ -26,10 +26,10 @@ You can see it working when, after connecting the pieces, you open the Household
 - [x] (2026-05-19 23:40Z) M74 — Gmail OAuth connection: migration `0013_google_accounts.sql`; `src/lib/server/google.ts` (AES-GCM `encryptToken`/`decryptToken`, HMAC-signed OAuth `state`, `exchangeCode`, `refreshAccessToken`, `revokeToken`, `gmailProfile`); `/api/google/connect`, `/callback`, `/accounts`, `/disconnect`; db helpers (`upsertGoogleAccount`, `listGoogleAccountsSafe`, `listGoogleAccounts`, `getGoogleAccount`, `deleteGoogleAccount`); a "Connected email" panel on the Household page with the in-product privacy notice; `scripts/set-google-secrets.sh`. The spike is folded into the real callback — it reads the Gmail profile, which confirms the `gmail.readonly` scope end to end. Gates green: check 473, unit 153, build, e2e api-google 4. Operator action still pending: the OAuth client + verification in the Google Cloud Console, and `bash scripts/set-google-secrets.sh`.
 - [x] (2026-05-19 23:51Z) M75 — Gmail ingestion to fact extraction: `POST /api/google/sync` (optional `GMAIL_SYNC_SECRET`-gated) reads each connected account's last day of email and extracts proposed facts; `gmail-sync.ts` (`syncAllAccounts` with per-account isolation, `syncOneAccount`); `google.ts` gains `freshAccessToken`, `listRecentMessageIds`, `getMessage`, `messageText`; `memory-extract.ts` refactored to a shared `runExtraction` core with `extractEmailFacts`; `factExistsForRef` dedup; raw email never stored; runner-README cron line. Gates green: check 477, unit 160, build, e2e api-google 5.
 - [x] (2026-05-20 00:00Z) M76 — Coordination view: `GET /api/memory/calendar` (confirmed facts with a `valid_at`, earliest first) and `GET /api/memory/list?predicate=` (confirmed facts by predicate; `needs` = the shopping list); db helpers `datedFacts` and `factsByPredicate`; a 📅 Calendar block and a 🛒 Shopping list block on the Household page, the latter with an add-item form that writes an explicit `needs` fact. Gates green: check 481, unit 160, build, e2e api-memory 12.
-- [ ] M77 — The app's own changelog: when a dev-channel build merges, the runner posts a plain-language changelog entry into a channel (#6 from the brainstorm).
+- [x] (2026-05-20 00:03Z) M77 — The app's own changelog: `POST /api/changelog` posts a plain-language "what shipped" note into the `#claude` channel as Claude Code, optional `CHANGELOG_SECRET`-gated; the runner README documents the post-deploy curl. Gates green: check 483, unit 160, build, e2e api-changelog 3.
 
-M71–M76 are complete and deployed. M77 (the app's own changelog) is the last
-milestone of this plan.
+All milestones (M71–M77) are complete and deployed. This plan is done — see
+the Outcomes & Retrospective section.
 
 
 ## Context and Orientation
@@ -240,4 +240,35 @@ None yet — this section will record what M74's OAuth spike learns about the re
 
 ## Outcomes & Retrospective
 
-Pending — to be written as milestones complete.
+Delivered (M71–M77, all merged to `main`, deployed, and verified in
+production). The household now has a memory: a small knowledge graph in D1
+(`memory_entities` + `memory_facts`) that adult members write to and ask in
+plain language. Facts arrive three ways — stated explicitly, extracted by the
+AI from conversations (M73) and from connected Gmail accounts (M74/M75), each
+proposed and then confirmed by a member before it becomes answerable. Recall
+is semantic, backed by a second Vectorize index (M72). Coordination — a
+calendar and a shopping list — falls out of the same facts as a view (M76).
+The Gmail connection uses OAuth with the tokens encrypted at rest, gated to
+adult members, and is covered by a Privacy Policy and Terms hardened for
+Google's restricted-scope verification. M77 lets the app post its own
+changelog into the `#claude` channel.
+
+What went to plan: the D1-graph decision held up — at household scale the
+nodes/edges model in SQLite needed no graph engine, and pairing it with
+Vectorize for fuzzy recall worked cleanly. The propose→confirm loop made the
+same shape serve conversation extraction, Gmail extraction, and explicit
+capture. Reusing the established gating pattern (a feature reports itself
+unavailable when its binding/secret is absent) kept every milestone E2E-green
+in CI without any cloud credentials.
+
+What changed along the way: OAuth tokens are encrypted at rest, not stored in
+plain text — the restricted-scope security assessment (CASA / ASVS 6.1.1) and
+the published Privacy Policy required it (see the Decision Log). The Gmail sync
+uses a simple `newer_than:1d` window with `source_ref` de-duplication rather
+than the fragile Gmail history-id cursor — boring and reliable over clever.
+
+What remains, outside this plan: Google's restricted-scope verification and
+security assessment are an operator/Google process measured in weeks; the code
+is complete and live behind it. Date-aware extraction (so an extracted email
+fact lands on the calendar automatically, rather than only explicitly-dated
+facts) is a natural follow-on left for a future plan.
