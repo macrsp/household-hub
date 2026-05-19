@@ -36,4 +36,26 @@ describe('parseExtractedFacts', () => {
 		const lines = Array.from({ length: 8 }, (_, i) => `s${i} | p | o${i}`).join('\n');
 		expect(parseExtractedFacts(lines)).toHaveLength(5);
 	});
+
+	it('captures a YYYY-MM-DD date from a fourth field (M78)', () => {
+		expect(parseExtractedFacts('school | field_trip | the zoo | 2026-06-02')).toEqual([
+			{ subject: 'school', predicate: 'field_trip', object: 'the zoo', date: '2026-06-02' }
+		]);
+	});
+
+	it('captures a date with a time (M78)', () => {
+		expect(parseExtractedFacts('Mia | dentist | checkup | 2026-06-02 14:30')).toEqual([
+			{ subject: 'Mia', predicate: 'dentist', object: 'checkup', date: '2026-06-02 14:30' }
+		]);
+	});
+
+	it('ignores a fourth field that carries no date (M78)', () => {
+		expect(parseExtractedFacts('Mia | teacher | Ms. Lee | sometime soon')).toEqual([
+			{ subject: 'Mia', predicate: 'teacher', object: 'Ms. Lee' }
+		]);
+	});
+
+	it('drops a line with five fields (M78)', () => {
+		expect(parseExtractedFacts('a | b | c | 2026-06-02 | extra')).toEqual([]);
+	});
 });

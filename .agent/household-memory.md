@@ -27,6 +27,7 @@ You can see it working when, after connecting the pieces, you open the Household
 - [x] (2026-05-19 23:51Z) M75 — Gmail ingestion to fact extraction: `POST /api/google/sync` (optional `GMAIL_SYNC_SECRET`-gated) reads each connected account's last day of email and extracts proposed facts; `gmail-sync.ts` (`syncAllAccounts` with per-account isolation, `syncOneAccount`); `google.ts` gains `freshAccessToken`, `listRecentMessageIds`, `getMessage`, `messageText`; `memory-extract.ts` refactored to a shared `runExtraction` core with `extractEmailFacts`; `factExistsForRef` dedup; raw email never stored; runner-README cron line. Gates green: check 477, unit 160, build, e2e api-google 5.
 - [x] (2026-05-20 00:00Z) M76 — Coordination view: `GET /api/memory/calendar` (confirmed facts with a `valid_at`, earliest first) and `GET /api/memory/list?predicate=` (confirmed facts by predicate; `needs` = the shopping list); db helpers `datedFacts` and `factsByPredicate`; a 📅 Calendar block and a 🛒 Shopping list block on the Household page, the latter with an add-item form that writes an explicit `needs` fact. Gates green: check 481, unit 160, build, e2e api-memory 12.
 - [x] (2026-05-20 00:03Z) M77 — The app's own changelog: `POST /api/changelog` posts a plain-language "what shipped" note into the `#claude` channel as Claude Code, optional `CHANGELOG_SECRET`-gated; the runner README documents the post-deploy curl. Gates green: check 483, unit 160, build, e2e api-changelog 3.
+- [x] (2026-05-20 00:08Z) M78 — Date-aware extraction (follow-on): the AI extractor may append a `YYYY-MM-DD` date as an optional 4th field (`subject | predicate | object | date`); `parseExtractedFacts` keeps it only when it is genuinely date-shaped, and `runExtraction` stores it as the fact's `valid_at`. A dated fact extracted from a conversation or an email therefore lands on the M76 calendar once an adult confirms it. Gates green: check 483, unit 164, build, e2e api-memory 12.
 
 All milestones (M71–M77) are complete and deployed. This plan is done — see
 the Outcomes & Retrospective section.
@@ -267,8 +268,11 @@ the published Privacy Policy required it (see the Decision Log). The Gmail sync
 uses a simple `newer_than:1d` window with `source_ref` de-duplication rather
 than the fragile Gmail history-id cursor — boring and reliable over clever.
 
+Follow-on shipped (M78): date-aware extraction — the AI extractor may attach a
+`YYYY-MM-DD` date to a fact, so an appointment mentioned in a chat or an email
+lands on the calendar automatically once confirmed, not only explicitly-dated
+facts.
+
 What remains, outside this plan: Google's restricted-scope verification and
 security assessment are an operator/Google process measured in weeks; the code
-is complete and live behind it. Date-aware extraction (so an extracted email
-fact lands on the calendar automatically, rather than only explicitly-dated
-facts) is a natural follow-on left for a future plan.
+is complete and live behind it.

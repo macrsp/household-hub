@@ -16,23 +16,37 @@ const MAX_FACTS = 5;
 // The confidence stamped on an AI-extracted candidate.
 const EXTRACT_CONFIDENCE = 0.6;
 
-// Parse the model's reply: one fact per line as `subject | predicate | object`.
-// Anything that is not a clean three-field line is dropped. Returns at most
-// MAX_FACTS triples.
-export function parseExtractedFacts(
-	text: string
-): { subject: string; predicate: string; object: string }[] {
-	const out: { subject: string; predicate: string; object: string }[] = [];
+export interface ExtractedFact {
+	subject: string;
+	predicate: string;
+	object: string;
+	// An ISO date (YYYY-MM-DD, optionally with a time) when the fact is tied to
+	// a calendar date — the model may add it as an optional 4th field (M78).
+	date?: string;
+}
+
+// Parse the model's reply: one fact per line as `subject | predicate | object`
+// or `subject | predicate | object | date`. A line that is not a clean three-
+// or four-field line is dropped; a 4th field is kept only when it contains a
+// YYYY-MM-DD date. Returns at most MAX_FACTS facts.
+export function parseExtractedFacts(text: string): ExtractedFact[] {
+	const out: ExtractedFact[] = [];
 	for (const raw of text.split('\n')) {
 		const line = raw.trim();
 		if (line === '' || /^none\b/i.test(line)) continue;
 		const parts = line.replace(/^[-*\d.)\s]+/, '').split('|');
-		if (parts.length !== 3) continue;
+		if (parts.length < 3 || parts.length > 4) continue;
 		const subject = parts[0].trim();
 		const predicate = parts[1].trim().toLowerCase().replace(/\s+/g, '_');
 		const object = parts[2].trim();
 		if (subject === '' || predicate === '' || object === '') continue;
-		out.push({ subject, predicate, object });
+		const fact: ExtractedFact = { subject, predicate, object };
+		if (parts.length === 4) {
+			// Keep the 4th field only if it actually carries a date.
+			const date = parts[3].trim().match(/\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2})?/)?.[0];
+			if (date) fact.date = date;
+		}
+		out.push(fact);
 		if (out.length >= MAX_FACTS) break;
 	}
 	return out;
@@ -62,6 +76,8 @@ async function runExtraction(
 		`things worth remembering long-term: names, relationships, dates,`,
 		`appointments, codes and passwords, sizes, preferences, schedules.`,
 		`Output one fact per line as: subject | predicate | object`,
+		`If the fact is tied to a specific calendar date, add that date as a`,
+		`fourth field in YYYY-MM-DD form: subject | predicate | object | date`,
 		`Use a short snake_case predicate. Do not invent anything. If the text`,
 		`states no durable fact, reply with exactly NONE.`,
 		``,
@@ -82,6 +98,7 @@ async function runExtraction(
 			subject_id: subjectEntity.id,
 			predicate: c.predicate,
 			object_text: c.object,
+			valid_at: c.date ?? null,
 			confidence: EXTRACT_CONFIDENCE,
 			status: 'proposed',
 			source: refs.source,
