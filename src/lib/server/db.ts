@@ -964,3 +964,22 @@ export async function factsByPredicate(
 		.all<FactWithNames>();
 	return results;
 }
+
+/**
+ * Confirmed memory facts for a set of ids, with subject/object names — the
+ * @claude assistant uses it to answer from the household memory graph (M82).
+ */
+export async function confirmedFactsByIds(
+	db: D1Database,
+	ids: string[]
+): Promise<FactWithNames[]> {
+	if (ids.length === 0) return [];
+	const placeholders = ids.map(() => '?').join(',');
+	const { results } = await db
+		.prepare(
+			`${FACT_WITH_NAMES_SELECT} WHERE f.status = 'confirmed' AND f.id IN (${placeholders})`
+		)
+		.bind(...ids)
+		.all<FactWithNames>();
+	return results;
+}
