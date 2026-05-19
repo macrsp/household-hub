@@ -76,10 +76,18 @@
 			connected account, read-only. household-hub cannot send, modify, or delete email.
 		</li>
 		<li>
-			<strong>How it is used:</strong> message text is analysed to extract candidate facts.
-			Analysis is performed by Cloudflare Workers AI, a machine-learning service running
-			on Cloudflare's infrastructure; the text is processed transiently to produce the
-			extracted facts and is not used by that provider to train models.
+			<strong>How it is used:</strong> message text is analysed only to extract candidate
+			household facts, which are then surfaced to a household member to review and
+			confirm. The extracted facts are the user-facing household-memory feature itself;
+			Gmail data is not used to build any separate database, dataset, or product.
+		</li>
+		<li>
+			<strong>AI processing:</strong> the analysis is performed by Cloudflare Workers AI,
+			a machine-learning service running on Cloudflare's infrastructure. Email text is
+			sent to the model for <strong>inference only</strong> — to produce the extracted
+			facts — and is processed transiently. Gmail content is <strong>never</strong> used
+			to train, fine-tune, or develop any AI or machine-learning model, whether by the
+			operator or by the AI provider.
 		</li>
 		<li>
 			<strong>What is stored:</strong> household-hub does <strong>not</strong> store the
@@ -126,9 +134,16 @@
 		>, including the Limited Use requirements. In plain terms: data obtained through Google
 		APIs is used only to provide and improve the user-facing features described above; it
 		is not transferred or sold except as needed to provide those features, to comply with
-		the law, or as part of a merger or acquisition; it is never used for advertising; and
-		it is not read by humans except with the user's explicit consent, where required for
-		security or law, or in aggregated and anonymised form.
+		the law, or as part of a merger or acquisition; it is never used for advertising,
+		retargeting, or personalised or interest-based ads; it is never used to assess
+		credit-worthiness or for lending; it is never transferred or sold to advertising
+		platforms, data brokers, or information resellers; it is never used to train,
+		fine-tune, or develop AI or machine-learning models; it is never used to build
+		databases, datasets, or products beyond the user-facing features described above; and
+		it is not read by humans except with the user's explicit consent to view specific
+		data, where necessary for security or to comply with the law, or where the data is
+		aggregated and anonymised. The operator, and any service providers acting on the
+		operator's behalf, are bound by these same requirements.
 	</p>
 
 	<h3>Withdrawing access</h3>
@@ -193,14 +208,49 @@
 		features described above.
 	</p>
 
-	<h2>Data retention</h2>
+	<h2>Data security</h2>
+	<p>
+		The Services apply the following measures to protect personal information, including
+		sensitive data and data obtained through Google APIs:
+	</p>
+	<ul>
+		<li>
+			All traffic between users, the Services, and Google's APIs is encrypted in transit
+			using HTTPS / TLS.
+		</li>
+		<li>
+			Data is stored in Cloudflare's managed database and is reachable only by the
+			Services and the service providers listed above, each acting on the operator's
+			behalf.
+		</li>
+		<li>
+			The OAuth access and refresh tokens for a connected Google account are encrypted at
+			rest, are never shown in the app interface, and are never written to logs.
+		</li>
+		<li>
+			The raw contents of Gmail messages are never stored — only the short facts a
+			household member reviews and confirms are kept.
+		</li>
+		<li>
+			The household-memory and Gmail-connection features are restricted to adult
+			household members.
+		</li>
+		<li>
+			When a user disconnects a Google account, the stored tokens for that account are
+			deleted and all further access to that account stops immediately.
+		</li>
+	</ul>
+
+	<h2>Data retention and deletion</h2>
 	<p>
 		Messages, household-memory facts, and member records are kept for as long as the
 		service remains in use. The raw contents of Gmail messages are not retained at all —
-		only the short confirmed facts extracted from them. A user may ask for their
-		information, message history, connected-account records, and extracted facts to be
-		removed by contacting the operator at the address below; such requests are honoured
-		promptly.
+		only the short confirmed facts extracted from them, and a Google message identifier
+		used to avoid processing the same message twice. A user may request deletion of their
+		personal information, message history, connected-account records, and extracted facts
+		at any time by contacting the operator at the address below; such requests are
+		honoured promptly, and disconnecting a Google account immediately deletes that
+		account's stored tokens.
 	</p>
 
 	<h2>Opting out and disconnecting</h2>

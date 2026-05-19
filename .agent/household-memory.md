@@ -91,13 +91,18 @@ The single declared source of truth for the enum-like string sets the server val
     id             TEXT PRIMARY KEY
     person_id      TEXT NOT NULL              -- FK -> people(id); who connected this account
     email          TEXT NOT NULL UNIQUE       -- the Gmail address
-    access_token   TEXT NOT NULL              -- short-lived OAuth access token
-    refresh_token  TEXT NOT NULL              -- long-lived OAuth refresh token
+    access_token   TEXT NOT NULL              -- OAuth access token, encrypted at rest
+    refresh_token  TEXT NOT NULL              -- OAuth refresh token, encrypted at rest
     token_expiry   TEXT NOT NULL              -- ISO 8601; when access_token expires
     history_id     TEXT                       -- nullable; Gmail's last-synced historyId for incremental sync
     created_at     TEXT NOT NULL
 
-The Decision Log records the choice to store OAuth tokens in D1 in plain text and the conditions under which that is acceptable.
+The `access_token` and `refresh_token` columns hold the tokens **encrypted at
+rest** — AES-GCM via the Web Crypto API, under a 256-bit key supplied only as
+the Worker secret `TOKEN_ENCRYPTION_KEY`. `src/lib/server/google.ts` exposes
+`encryptToken` / `decryptToken`; the plaintext token exists only transiently in
+memory while a Gmail request is made. The Decision Log records why this is
+required.
 
 
 ## Milestones
@@ -148,7 +153,7 @@ Acceptance: posting "Mia's teacher is Ms. Lee" produces a proposed fact; confirm
 
 This milestone connects a Google account. It begins as a spike because Gmail read access uses a *restricted* OAuth scope, and the consequences (see Decision Log and Surprises) must be confirmed against the real `practicepartner.app` Google Cloud project before ingestion is built on top.
 
-Spike first: register an OAuth client in the existing Google Cloud project with redirect URI `https://household.practicepartner.app/api/google/callback`; set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` via `wrangler secret put`. Implement `GET /api/google/connect` (redirects to Google's consent screen requesting scope `https://www.googleapis.com/auth/gmail.readonly` plus `openid email`, with a signed `state`) and `GET /api/google/callback` (verifies `state`, exchanges the `code` at `https://oauth2.googleapis.com/token`, stores a `google_accounts` row). Add migration `migrations/0013_google_accounts.sql`. Add `src/lib/server/google.ts` with the token exchange, a `freshAccessToken` helper that refreshes when `token_expiry` has passed, and a thin Gmail API client (`https://gmail.googleapis.com/gmail/v1/users/me/...`).
+Spike first: register an OAuth client in the existing Google Cloud project with redirect URI `https://household.practicepartner.app/api/google/callback`; set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and a freshly generated 256-bit `TOKEN_ENCRYPTION_KEY` via `wrangler pages secret put`. Implement `GET /api/google/connect` (redirects to Google's consent screen requesting scope `https://www.googleapis.com/auth/gmail.readonly` plus `openid email`, with a signed `state`) and `GET /api/google/callback` (verifies `state`, exchanges the `code` at `https://oauth2.googleapis.com/token`, stores a `google_accounts` row). Add migration `migrations/0013_google_accounts.sql`. Add `src/lib/server/google.ts` with: `encryptToken` / `decryptToken` (AES-GCM via the Web Crypto API under `TOKEN_ENCRYPTION_KEY`, so the `access_token` and `refresh_token` columns are ciphertext at rest — required by the restricted-scope security assessment and promised in `/privacy`); the OAuth token exchange; a `freshAccessToken` helper that decrypts, refreshes when `token_expiry` has passed, and re-encrypts; and a thin Gmail API client (`https://gmail.googleapis.com/gmail/v1/users/me/...`). The disconnect route deletes the `google_accounts` row, taking the stored tokens with it.
 
 Prove the spike: after connecting one account, a temporary `GET /api/google/debug` (removed before the milestone closes) returns that account's Gmail profile and the subject of its most recent message. This confirms the scope works end to end and surfaces the restricted-scope behaviour (testing-mode token lifetime, or production verification status) for the Decision Log.
 
@@ -208,7 +213,18 @@ Migrations use `CREATE TABLE IF NOT EXISTS` and are safe to re-apply. Fact embed
 
 2026-05-18 — Email ingestion uses the Gmail API with OAuth (Path B), not Gmail forwarding rules (Path A). The operator already runs a `practicepartner.app` Google Cloud project whose users pass the OAuth consent screen, so the marginal cost of Path B is lower for this operator than the general case, and it avoids per-person forwarding-rule setup. Risk carried into M74 as a spike: `gmail.readonly` is a Google *restricted* scope; depending on the project's publishing status, this can mean refresh tokens that expire every seven days (testing mode) or a required CASA security assessment (production). M74 confirms which applies before M75 builds on it.
 
-2026-05-18 — OAuth tokens are stored in D1 in plain text. D1 is not application-encrypted at rest. For a trusted, household-scale tool this is accepted, consistent with the project's existing posture (Twilio and Resend secrets live in environment bindings; the app is explicitly not a multi-tenant SaaS). If this feature later widens beyond a single trusted household, revisit by encrypting `access_token`/`refresh_token` with a key held only as a Worker secret.
+2026-05-18 — OAuth tokens are encrypted at rest (revised). An earlier draft of
+this plan accepted storing the Gmail OAuth tokens in D1 as plain text on the
+"trusted household tool" rationale. That is superseded: the Gmail scope is a
+Google *restricted* scope, so the project must pass Google's annual security
+assessment (CASA, against the OWASP ASVS), and ASVS 6.1.1 requires regulated
+private data — which OAuth tokens are — to be encrypted at rest. The published
+Privacy Policy at `/privacy` now also states plainly that these tokens are
+encrypted at rest, so the implementation must match the promise. M74 therefore
+encrypts `access_token` and `refresh_token` with AES-GCM (Web Crypto) under the
+`TOKEN_ENCRYPTION_KEY` Worker secret before they are written, and decrypts them
+only transiently when a Gmail request is made. The key is never stored in D1
+and never logged.
 
 2026-05-18 — The memory graph and Gmail connection are adult-only. The operator stated these are for the two main adults of the household, not guests or children. A `people.role` column (`'adult'` / `'member'`) is added in M71; all `/api/memory` routes and the M74 Gmail-connect flow check `isAdult` and the UI is shown only to adults. The app has no login — identity is the chosen `personId`, consistent with the existing trusted-household posture — so this is a soft gate (UI plus a route check), not an authentication boundary. The same `role` will gate who appears in the `#claude` dev channel when M77-area work touches it.
 
