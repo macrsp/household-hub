@@ -58,6 +58,7 @@ export const POST: RequestHandler = async ({ platform, request }) => {
 		db.prepare('DELETE FROM push_subscriptions'),
 		db.prepare('DELETE FROM reactions'),
 		db.prepare('DELETE FROM sms_consents'),
+		db.prepare('DELETE FROM google_accounts'),
 		db.prepare('DELETE FROM memory_facts'),
 		db.prepare('DELETE FROM memory_entities'),
 		db.prepare('DELETE FROM deliveries'),

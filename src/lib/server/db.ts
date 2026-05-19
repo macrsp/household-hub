@@ -829,3 +829,94 @@ export async function rejectProposedFact(db: D1Database, id: string): Promise<bo
 		.run();
 	return (res.meta.changes ?? 0) > 0;
 }
+
+// --- Connected Google accounts (M74) -------------------------------------
+//
+// One row per connected Gmail account. The token columns hold AES-GCM
+// ciphertext (see src/lib/server/google.ts) — never clear text.
+
+export interface GoogleAccountRow {
+	id: string;
+	person_id: string;
+	email: string;
+	access_token: string;
+	refresh_token: string;
+	token_expiry: string;
+	history_id: string | null;
+	created_at: string;
+}
+
+/**
+ * Store a connected Google account. `email` is UNIQUE, so reconnecting the
+ * same mailbox replaces the prior row in one atomic batch — the access and
+ * refresh tokens passed here must already be encrypted.
+ */
+export async function upsertGoogleAccount(db: D1Database, acct: GoogleAccountRow): Promise<void> {
+	await db.batch([
+		db.prepare('DELETE FROM google_accounts WHERE email = ?').bind(acct.email),
+		db
+			.prepare(
+				`INSERT INTO google_accounts
+				 (id, person_id, email, access_token, refresh_token, token_expiry, history_id, created_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+			)
+			.bind(
+				acct.id,
+				acct.person_id,
+				acct.email,
+				acct.access_token,
+				acct.refresh_token,
+				acct.token_expiry,
+				acct.history_id,
+				acct.created_at
+			)
+	]);
+}
+
+/** The connected accounts, without the token columns — safe to send a client. */
+export async function listGoogleAccountsSafe(
+	db: D1Database
+): Promise<Array<{ id: string; person_id: string; email: string; created_at: string }>> {
+	const { results } = await db
+		.prepare(
+			'SELECT id, person_id, email, created_at FROM google_accounts ORDER BY created_at ASC'
+		)
+		.all<{ id: string; person_id: string; email: string; created_at: string }>();
+	return results;
+}
+
+/** Every connected account with its (encrypted) tokens — for the M75 sync. */
+export async function listGoogleAccounts(db: D1Database): Promise<GoogleAccountRow[]> {
+	const { results } = await db
+		.prepare('SELECT * FROM google_accounts ORDER BY created_at ASC')
+		.all<GoogleAccountRow>();
+	return results;
+}
+
+/** One connected account by id, or null. */
+export async function getGoogleAccount(
+	db: D1Database,
+	id: string
+): Promise<GoogleAccountRow | null> {
+	return await db
+		.prepare('SELECT * FROM google_accounts WHERE id = ?')
+		.bind(id)
+		.first<GoogleAccountRow>();
+}
+
+/**
+ * Delete a connected account. The `person_id` is part of the WHERE clause, so
+ * a member can only disconnect an account they connected. Returns true if a
+ * row was removed.
+ */
+export async function deleteGoogleAccount(
+	db: D1Database,
+	id: string,
+	personId: string
+): Promise<boolean> {
+	const res = await db
+		.prepare('DELETE FROM google_accounts WHERE id = ? AND person_id = ?')
+		.bind(id, personId)
+		.run();
+	return (res.meta.changes ?? 0) > 0;
+}

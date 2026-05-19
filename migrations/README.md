@@ -35,6 +35,7 @@ paths must follow the User-Asset Durability invariants.
 | `push_subscriptions` | Browser Web Push subscriptions        | runtime (`/api/push/subscribe`) |
 | `memory_entities` | Household memory graph nodes (people, pets, places, things) | runtime (`/api/memory` — M71) |
 | `memory_facts`  | Household memory graph edges (the facts the family can ask) | runtime (`/api/memory` — M71) |
+| `google_accounts` | Connected Gmail accounts (OAuth tokens, encrypted at rest) | runtime (`/api/google` — M74) |
 
 ## Transport string sets — single source of truth
 
@@ -86,3 +87,6 @@ run at least one "this should always be zero" query per class:
   both NULL or both set (a fact's object is exactly one of the two); zero rows
   whose `source` is outside `FACT_SOURCES`; zero rows whose `confirmed_at` is
   earlier than `created_at` (M71).
+- `google_accounts` — zero rows whose `person_id` is absent from `people`;
+  zero rows with a NULL or empty `access_token`, `refresh_token`, or
+  `token_expiry` (M74).
