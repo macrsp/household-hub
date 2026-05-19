@@ -54,10 +54,25 @@
 	// Connected Gmail accounts (M74).
 	let googleAccounts = $state<Array<{ id: string; person_id: string; email: string }>>([]);
 	let gmailNotice = $state('');
+	// Coordination views over the memory graph (M76): the calendar and the
+	// shopping list.
+	interface CoordFact {
+		id: string;
+		subject_name: string;
+		predicate: string;
+		object_text: string | null;
+		object_name: string | null;
+		valid_at: string | null;
+	}
+	let calendarFacts = $state<CoordFact[]>([]);
+	let shoppingItems = $state<CoordFact[]>([]);
+	let newItem = $state('');
 	$effect(() => {
 		if (memoryPersonId !== '') {
 			loadProposed();
 			loadGoogleAccounts();
+			loadCalendar();
+			loadShopping();
 		}
 	});
 
@@ -250,6 +265,55 @@
 		}
 	}
 
+	// Coordination (M76): load the calendar and shopping list, and add an item.
+	async function loadCalendar() {
+		if (memoryPersonId === '') return;
+		try {
+			const res = await fetch(
+				`/api/memory/calendar?personId=${encodeURIComponent(memoryPersonId)}`
+			);
+			if (res.ok) calendarFacts = await res.json();
+		} catch {
+			// transient
+		}
+	}
+
+	async function loadShopping() {
+		if (memoryPersonId === '') return;
+		try {
+			const res = await fetch(
+				`/api/memory/list?personId=${encodeURIComponent(memoryPersonId)}&predicate=needs`
+			);
+			if (res.ok) shoppingItems = await res.json();
+		} catch {
+			// transient
+		}
+	}
+
+	async function addShoppingItem() {
+		const item = newItem.trim();
+		if (item === '' || memoryPersonId === '') return;
+		try {
+			const res = await fetch('/api/memory/facts', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					personId: memoryPersonId,
+					subject: 'shopping list',
+					subjectKind: 'thing',
+					predicate: 'needs',
+					object: item
+				})
+			});
+			if (res.ok) {
+				newItem = '';
+				loadShopping();
+			}
+		} catch {
+			// transient
+		}
+	}
+
 	onMount(() => {
 		load();
 		// Surface the outcome of a Gmail OAuth round trip (the callback
@@ -384,6 +448,48 @@
 						</li>
 					{/each}
 				</ul>
+			</div>
+
+			<div class="coord">
+				<h3 class="memory-review-title">📅 Calendar</h3>
+				{#if calendarFacts.length === 0}
+					<p class="memory-hint">
+						No dated items yet. Confirm a fact with a date, or add one above with a date.
+					</p>
+				{:else}
+					<ul class="coord-list">
+						{#each calendarFacts as f (f.id)}
+							<li class="coord-item">
+								<span class="coord-when">{f.valid_at}</span>
+								<span>
+									<strong>{f.subject_name}</strong> — {f.predicate.replace(/_/g, ' ')}:
+									{f.object_text ?? f.object_name}
+								</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+
+			<div class="coord">
+				<h3 class="memory-review-title">🛒 Shopping list</h3>
+				<form
+					class="coord-add"
+					onsubmit={(e) => {
+						e.preventDefault();
+						addShoppingItem();
+					}}
+				>
+					<input type="text" placeholder="Add an item…" bind:value={newItem} />
+					<button type="submit" disabled={newItem.trim() === ''}>Add</button>
+				</form>
+				{#if shoppingItems.length > 0}
+					<ul class="coord-list">
+						{#each shoppingItems as item (item.id)}
+							<li class="coord-item">{item.object_text ?? item.object_name}</li>
+						{/each}
+					</ul>
+				{/if}
 			</div>
 		</section>
 	{/if}
@@ -685,6 +791,49 @@
 		background: var(--accent);
 		color: var(--on-accent);
 		text-decoration: none;
+	}
+
+	.coord {
+		margin-top: 1rem;
+		padding-top: 0.8rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.coord-add {
+		display: flex;
+		gap: 0.4rem;
+		margin: 0.4rem 0;
+	}
+
+	.coord-add input {
+		flex: 1;
+		min-width: 0;
+		font-size: 0.85rem;
+	}
+
+	.coord-list {
+		list-style: none;
+		padding: 0;
+		margin: 0.4rem 0 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+
+	.coord-item {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		padding: 0.35rem 0.6rem;
+		background: var(--raised, var(--surface));
+		border: 1px solid var(--border);
+		border-radius: 0.4rem;
+		font-size: 0.85rem;
+	}
+
+	.coord-when {
+		font-weight: 600;
+		color: var(--accent);
 	}
 
 	.sr-only {
