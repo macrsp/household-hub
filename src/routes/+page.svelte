@@ -1898,6 +1898,8 @@
 		<span aria-hidden="true">·</span>
 		<a href="/privacy">Privacy Policy</a>
 		<span aria-hidden="true">·</span>
+		<a href="/terms">Terms of Service</a>
+		<span aria-hidden="true">·</span>
 		<a href="/sms-terms">SMS Terms</a>
 	</footer>
 </main>

@@ -73,6 +73,13 @@ test.describe('conversation UI', () => {
 		).toBeVisible();
 	});
 
+	test('loads the Terms of Service page', async ({ page }) => {
+		await page.goto('/terms');
+		await expect(
+			page.getByRole('heading', { name: /Terms of Service/, level: 1 })
+		).toBeVisible();
+	});
+
 	test('loads the SMS terms of service page', async ({ page }) => {
 		await page.goto('/sms-terms');
 		await expect(
