@@ -31,6 +31,13 @@ test.describe('Gmail connection API', () => {
 		expect(denied.status()).toBe(403);
 	});
 
+	test('the Gmail sync reports unconfigured in this environment (M75)', async ({ request }) => {
+		const res = await request.post('/api/google/sync');
+		expect(res.status()).toBe(503);
+		const data = await res.json();
+		expect(data.reason).toBe('gmail-unconfigured');
+	});
+
 	test('disconnect validates its body and is adult-gated', async ({ request }) => {
 		// Missing accountId — rejected before the adult check.
 		const bad = await request.post('/api/google/disconnect', {

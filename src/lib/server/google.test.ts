@@ -4,8 +4,13 @@ import {
 	decryptToken,
 	signState,
 	verifyState,
-	googleConfigured
+	googleConfigured,
+	messageText
 } from './google';
+
+function b64url(s: string): string {
+	return Buffer.from(s, 'utf8').toString('base64url');
+}
 
 // A sample base64-encoded 256-bit key — the shape of TOKEN_ENCRYPTION_KEY.
 const KEY = 'LlduK3p7W3l+aFJ9+vZbUr4q1hiMByHAtsHCDLz3jsM=';
@@ -69,5 +74,61 @@ describe('googleConfigured', () => {
 			false
 		);
 		expect(googleConfigured(env({}))).toBe(false);
+	});
+});
+
+describe('messageText', () => {
+	it('combines the Subject header and the decoded plain-text body', () => {
+		const msg = {
+			id: 'm1',
+			payload: {
+				headers: [{ name: 'Subject', value: 'Dentist appointment' }],
+				mimeType: 'text/plain',
+				body: { data: b64url('Your appointment is on June 2 at 3pm.') }
+			}
+		};
+		expect(messageText(msg)).toBe(
+			'Subject: Dentist appointment\n\nYour appointment is on June 2 at 3pm.'
+		);
+	});
+
+	it('finds the plain-text part inside a multipart message', () => {
+		const msg = {
+			id: 'm2',
+			payload: {
+				headers: [{ name: 'subject', value: 'Trip' }],
+				mimeType: 'multipart/alternative',
+				parts: [
+					{ mimeType: 'text/html', body: { data: b64url('<p>ignore me</p>') } },
+					{ mimeType: 'text/plain', body: { data: b64url('the real body') } }
+				]
+			}
+		};
+		expect(messageText(msg)).toBe('Subject: Trip\n\nthe real body');
+	});
+
+	it('falls back to the snippet when there is no plain-text part', () => {
+		const msg = {
+			id: 'm3',
+			snippet: 'a short preview',
+			payload: {
+				headers: [],
+				mimeType: 'text/html',
+				body: { data: b64url('<p>x</p>') }
+			}
+		};
+		expect(messageText(msg)).toBe('a short preview');
+	});
+
+	it('caps the body length', () => {
+		const msg = {
+			id: 'm4',
+			payload: {
+				headers: [],
+				mimeType: 'text/plain',
+				body: { data: b64url('x'.repeat(5000)) }
+			}
+		};
+		expect(messageText(msg, 100)).toHaveLength(100);
 	});
 });
