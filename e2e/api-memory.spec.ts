@@ -137,6 +137,37 @@ test.describe('household memory API', () => {
 		expect(denied.status()).toBe(403);
 	});
 
+	test('the calendar endpoint is adult-gated and returns an array (M76)', async ({
+		request
+	}) => {
+		const ok = await request.get('/api/memory/calendar?personId=person-matt');
+		expect(ok.status()).toBe(200);
+		expect(Array.isArray(await ok.json())).toBe(true);
+
+		const denied = await request.get('/api/memory/calendar?personId=person-three');
+		expect(denied.status()).toBe(403);
+	});
+
+	test('a shopping-list item is added and listed (M76)', async ({ request }) => {
+		const add = await request.post('/api/memory/facts', {
+			data: {
+				personId: 'person-matt',
+				subject: 'shopping list',
+				predicate: 'needs',
+				object: 'oat milk'
+			}
+		});
+		expect(add.status(), await add.text()).toBe(201);
+
+		const list = await request.get('/api/memory/list?personId=person-matt&predicate=needs');
+		expect(list.status()).toBe(200);
+		const items = await list.json();
+		expect(items.some((f: { object_text: string }) => f.object_text === 'oat milk')).toBe(true);
+
+		const denied = await request.get('/api/memory/list?personId=person-three');
+		expect(denied.status()).toBe(403);
+	});
+
 	test('the entities list is adult-gated and returns an array', async ({ request }) => {
 		await request.post('/api/memory/facts', {
 			data: {

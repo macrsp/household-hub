@@ -932,3 +932,35 @@ export async function factExistsForRef(db: D1Database, sourceRef: string): Promi
 		.first<{ x: number }>();
 	return row !== null;
 }
+
+// --- Coordination views over the memory graph (M76) ----------------------
+
+/**
+ * Confirmed facts that carry a date (`valid_at`) — the household calendar,
+ * earliest first.
+ */
+export async function datedFacts(db: D1Database): Promise<FactWithNames[]> {
+	const { results } = await db
+		.prepare(
+			`${FACT_WITH_NAMES_SELECT} WHERE f.status = 'confirmed' AND f.valid_at IS NOT NULL ORDER BY f.valid_at ASC`
+		)
+		.all<FactWithNames>();
+	return results;
+}
+
+/**
+ * Confirmed facts with a given predicate — e.g. predicate `needs` is the
+ * household shopping list. Newest first.
+ */
+export async function factsByPredicate(
+	db: D1Database,
+	predicate: string
+): Promise<FactWithNames[]> {
+	const { results } = await db
+		.prepare(
+			`${FACT_WITH_NAMES_SELECT} WHERE f.status = 'confirmed' AND f.predicate = ? ORDER BY f.created_at DESC`
+		)
+		.bind(predicate)
+		.all<FactWithNames>();
+	return results;
+}

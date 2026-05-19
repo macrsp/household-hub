@@ -25,12 +25,11 @@ You can see it working when, after connecting the pieces, you open the Household
 - [x] (2026-05-18 18:31Z) M73 — AI fact extraction from conversations: `memory-extract.ts` (`parseExtractedFacts`, `extractFacts`) wired into the messages POST route via `waitUntil`; `GET /api/memory/proposed`; `POST /api/memory/facts/[id]/confirm` (indexes the fact) and `.../reject`; a "facts to review" panel on the Household page. Gates green: check 461, unit 144, build, e2e api-memory 10.
 - [x] (2026-05-19 23:40Z) M74 — Gmail OAuth connection: migration `0013_google_accounts.sql`; `src/lib/server/google.ts` (AES-GCM `encryptToken`/`decryptToken`, HMAC-signed OAuth `state`, `exchangeCode`, `refreshAccessToken`, `revokeToken`, `gmailProfile`); `/api/google/connect`, `/callback`, `/accounts`, `/disconnect`; db helpers (`upsertGoogleAccount`, `listGoogleAccountsSafe`, `listGoogleAccounts`, `getGoogleAccount`, `deleteGoogleAccount`); a "Connected email" panel on the Household page with the in-product privacy notice; `scripts/set-google-secrets.sh`. The spike is folded into the real callback — it reads the Gmail profile, which confirms the `gmail.readonly` scope end to end. Gates green: check 473, unit 153, build, e2e api-google 4. Operator action still pending: the OAuth client + verification in the Google Cloud Console, and `bash scripts/set-google-secrets.sh`.
 - [x] (2026-05-19 23:51Z) M75 — Gmail ingestion to fact extraction: `POST /api/google/sync` (optional `GMAIL_SYNC_SECRET`-gated) reads each connected account's last day of email and extracts proposed facts; `gmail-sync.ts` (`syncAllAccounts` with per-account isolation, `syncOneAccount`); `google.ts` gains `freshAccessToken`, `listRecentMessageIds`, `getMessage`, `messageText`; `memory-extract.ts` refactored to a shared `runExtraction` core with `extractEmailFacts`; `factExistsForRef` dedup; raw email never stored; runner-README cron line. Gates green: check 477, unit 160, build, e2e api-google 5.
-- [ ] M76 — Coordination view: a calendar over time-bound facts and a shared shopping list over `needs` facts.
+- [x] (2026-05-20 00:00Z) M76 — Coordination view: `GET /api/memory/calendar` (confirmed facts with a `valid_at`, earliest first) and `GET /api/memory/list?predicate=` (confirmed facts by predicate; `needs` = the shopping list); db helpers `datedFacts` and `factsByPredicate`; a 📅 Calendar block and a 🛒 Shopping list block on the Household page, the latter with an add-item form that writes an explicit `needs` fact. Gates green: check 481, unit 160, build, e2e api-memory 12.
 - [ ] M77 — The app's own changelog: when a dev-channel build merges, the runner posts a plain-language changelog entry into a channel (#6 from the brainstorm).
 
-M71–M75 are complete and deployed. The Gmail connection and ingestion code is
-live; the Google secrets are set, so the feature is active for connected
-accounts. M76 is next.
+M71–M76 are complete and deployed. M77 (the app's own changelog) is the last
+milestone of this plan.
 
 
 ## Context and Orientation
