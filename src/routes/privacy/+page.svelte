@@ -5,7 +5,7 @@
 <main>
 	<p class="back"><a href="/">&larr; back to household-hub</a></p>
 
-	<h1>Privacy Policy</h1>
+	<h1><img class="brand-logo" src="/favicon.png" alt="" />Privacy Policy</h1>
 	<p class="effective">Effective date: May 18, 2026</p>
 	<p>
 		This Privacy Policy explains how the personal-software services operated by one
@@ -321,6 +321,13 @@
 	h1 {
 		font-size: 1.4rem;
 		margin: 0.5rem 0 0.25rem;
+	}
+
+	.brand-logo {
+		height: 1.5em;
+		width: auto;
+		vertical-align: -0.34em;
+		margin-right: 0.4rem;
 	}
 
 	.effective {

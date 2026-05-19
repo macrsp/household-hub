@@ -5,7 +5,7 @@
 <main>
 	<p class="back"><a href="/">&larr; back to household-hub</a></p>
 
-	<h1>Terms of Service</h1>
+	<h1><img class="brand-logo" src="/favicon.png" alt="" />Terms of Service</h1>
 	<p class="effective">Effective date: May 18, 2026</p>
 	<p>
 		These Terms of Service ("Terms") govern use of the personal-software services operated
@@ -193,6 +193,13 @@
 	h1 {
 		font-size: 1.4rem;
 		margin: 0.5rem 0 0.25rem;
+	}
+
+	.brand-logo {
+		height: 1.5em;
+		width: auto;
+		vertical-align: -0.34em;
+		margin-right: 0.4rem;
 	}
 
 	.effective {

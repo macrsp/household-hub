@@ -227,7 +227,7 @@
 
 <main>
 	<p class="back"><a href="/">&larr; back to household-hub</a></p>
-	<h1>Household members</h1>
+	<h1><img class="brand-logo" src="/favicon.png" alt="" />Household members</h1>
 	<p class="intro">
 		Add the members of your household and the addresses they receive messages at.
 		A new member joins every conversation automatically.
@@ -435,6 +435,13 @@
 	h1 {
 		font-size: 1.4rem;
 		margin: 0.5rem 0 0.25rem;
+	}
+
+	.brand-logo {
+		height: 1.5em;
+		width: auto;
+		vertical-align: -0.34em;
+		margin-right: 0.4rem;
 	}
 
 	.intro {
