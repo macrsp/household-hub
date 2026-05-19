@@ -27,6 +27,13 @@ declare global {
 				// Shared secret for the scheduled digest poster. When set,
 				// POST /api/digest/post requires a matching X-Webhook-Secret.
 				DIGEST_POST_SECRET?: string;
+				// Google OAuth client for the Gmail connection (M74). When all
+				// three are present, the /api/google/* routes are live; absent
+				// (local/CI), they report Gmail unconfigured. TOKEN_ENCRYPTION_KEY
+				// is a base64 256-bit key that encrypts the stored OAuth tokens.
+				GOOGLE_CLIENT_ID?: string;
+				GOOGLE_CLIENT_SECRET?: string;
+				TOKEN_ENCRYPTION_KEY?: string;
 				// Public base URL of the deployed app (not a secret) — used to
 				// build the Twilio delivery-status callback URL.
 				PUBLIC_APP_URL?: string;

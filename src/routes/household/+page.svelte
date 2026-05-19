@@ -51,8 +51,14 @@
 		subject_name: string;
 	}
 	let proposedFacts = $state<ProposedFact[]>([]);
+	// Connected Gmail accounts (M74).
+	let googleAccounts = $state<Array<{ id: string; person_id: string; email: string }>>([]);
+	let gmailNotice = $state('');
 	$effect(() => {
-		if (memoryPersonId !== '') loadProposed();
+		if (memoryPersonId !== '') {
+			loadProposed();
+			loadGoogleAccounts();
+		}
 	});
 
 	async function load() {
@@ -218,7 +224,41 @@
 		}
 	}
 
-	onMount(load);
+	// Connected Gmail accounts (M74): load them, and disconnect one.
+	async function loadGoogleAccounts() {
+		if (memoryPersonId === '') return;
+		try {
+			const res = await fetch(
+				`/api/google/accounts?personId=${encodeURIComponent(memoryPersonId)}`
+			);
+			if (res.ok) googleAccounts = await res.json();
+		} catch {
+			// transient
+		}
+	}
+
+	async function disconnectGmail(accountId: string) {
+		try {
+			const res = await fetch('/api/google/disconnect', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ personId: memoryPersonId, accountId })
+			});
+			if (res.ok) googleAccounts = googleAccounts.filter((a) => a.id !== accountId);
+		} catch {
+			// transient
+		}
+	}
+
+	onMount(() => {
+		load();
+		// Surface the outcome of a Gmail OAuth round trip (the callback
+		// redirects back here with a ?gmail= status).
+		const status = new URLSearchParams(location.search).get('gmail');
+		if (status === 'connected') gmailNotice = 'Gmail account connected.';
+		else if (status === 'denied') gmailNotice = 'Gmail connection was cancelled.';
+		else if (status === 'error') gmailNotice = 'Gmail connection failed — please try again.';
+	});
 </script>
 
 <svelte:head>
@@ -312,6 +352,39 @@
 					</ul>
 				</div>
 			{/if}
+
+			<div class="gmail-connect">
+				<h3 class="memory-review-title">Connected email</h3>
+				<p class="memory-hint">
+					Connect an adult's Gmail and the AI will suggest household facts and dates from
+					it — appointments, school notices, deliveries — for review. household-hub reads
+					email read-only, never stores the raw email, and access can be withdrawn any
+					time. See the <a href="/privacy">Privacy Policy</a>.
+				</p>
+				{#if gmailNotice}
+					<p class="gmail-notice">{gmailNotice}</p>
+				{/if}
+				<ul class="gmail-list">
+					{#each adults as adult (adult.id)}
+						{@const acct = googleAccounts.find((a) => a.person_id === adult.id)}
+						<li class="gmail-item">
+							<span>
+								<strong>{adult.display_name}</strong>
+								{#if acct}&mdash; {acct.email}{/if}
+							</span>
+							{#if acct}
+								<button type="button" onclick={() => disconnectGmail(acct.id)}>
+									Disconnect
+								</button>
+							{:else}
+								<a class="gmail-connect-btn" href="/api/google/connect?personId={adult.id}">
+									Connect Gmail
+								</a>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</div>
 		</section>
 	{/if}
 
@@ -565,6 +638,53 @@
 	.memory-review-actions button {
 		font-size: 0.75rem;
 		padding: 0.2rem 0.5rem;
+	}
+
+	.gmail-connect {
+		margin-top: 1rem;
+		padding-top: 0.8rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.gmail-notice {
+		margin: 0.4rem 0;
+		padding: 0.4rem 0.6rem;
+		background: var(--raised, var(--surface));
+		border: 1px solid var(--accent);
+		border-radius: 0.4rem;
+		font-size: 0.85rem;
+	}
+
+	.gmail-list {
+		list-style: none;
+		padding: 0;
+		margin: 0.4rem 0 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.gmail-item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.4rem;
+		padding: 0.4rem 0.6rem;
+		background: var(--raised, var(--surface));
+		border: 1px solid var(--border);
+		border-radius: 0.4rem;
+		font-size: 0.85rem;
+	}
+
+	.gmail-connect-btn {
+		font-size: 0.78rem;
+		padding: 0.25rem 0.6rem;
+		border: 1px solid var(--accent);
+		border-radius: 0.4rem;
+		background: var(--accent);
+		color: var(--on-accent);
+		text-decoration: none;
 	}
 
 	.sr-only {
