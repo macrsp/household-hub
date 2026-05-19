@@ -9,8 +9,9 @@ export const ENTITY_KINDS = ['person', 'pet', 'place', 'org', 'thing', 'event'] 
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
 // Where a fact came from: stated explicitly by a member, extracted by the AI
-// from a hub conversation, or extracted from a connected email account.
-export const FACT_SOURCES = ['explicit', 'conversation', 'email'] as const;
+// from a hub conversation, from a connected email account, or from a
+// photographed flyer (M80).
+export const FACT_SOURCES = ['explicit', 'conversation', 'email', 'flyer'] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 export function isEntityKind(value: unknown): value is EntityKind {

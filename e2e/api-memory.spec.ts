@@ -168,6 +168,32 @@ test.describe('household memory API', () => {
 		expect(denied.status()).toBe(403);
 	});
 
+	test('the flyer-scan endpoint validates and is adult-gated (M80)', async ({ request }) => {
+		// A non-adult is refused.
+		const denied = await request.post('/api/memory/flyer?personId=person-three', {
+			data: Buffer.from('fake-image-bytes'),
+			headers: { 'content-type': 'image/jpeg' }
+		});
+		expect(denied.status()).toBe(403);
+
+		// An empty body is rejected before the AI check.
+		const empty = await request.post('/api/memory/flyer?personId=person-matt', {
+			data: Buffer.from(''),
+			headers: { 'content-type': 'image/jpeg' }
+		});
+		expect(empty.status()).toBe(400);
+
+		// A well-formed upload: the E2E env has no Workers AI, so the flyer
+		// scan reports itself unavailable (503) rather than erroring.
+		const ok = await request.post('/api/memory/flyer?personId=person-matt', {
+			data: Buffer.from('fake-image-bytes'),
+			headers: { 'content-type': 'image/jpeg' }
+		});
+		expect([200, 503]).toContain(ok.status());
+		const data = await ok.json();
+		expect(typeof data.available).toBe('boolean');
+	});
+
 	test('the entities list is adult-gated and returns an array', async ({ request }) => {
 		await request.post('/api/memory/facts', {
 			data: {

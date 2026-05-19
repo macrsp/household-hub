@@ -7,6 +7,7 @@
 // answerable.
 
 import { upsertEntity, insertFact, type Message } from './db';
+import type { FactSource } from './memory-kinds';
 
 const EXTRACT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 const CLAUDE_PERSON_ID = 'person-claude';
@@ -53,10 +54,35 @@ export function parseExtractedFacts(text: string): ExtractedFact[] {
 }
 
 // The provenance attached to the proposed facts of one extraction run.
-interface ExtractionRefs {
-	source: 'conversation' | 'email';
+export interface ExtractionRefs {
+	source: FactSource;
 	source_message_id?: string;
 	source_ref?: string;
+}
+
+// Store parsed candidate facts as proposed facts. Shared by the text
+// extractor (conversation/email) and the flyer extractor (M80). Returns the
+// number stored. Throws on a DB failure — the caller wraps it.
+export async function storeProposedFacts(
+	env: App.Platform['env'],
+	candidates: ExtractedFact[],
+	refs: ExtractionRefs
+): Promise<number> {
+	for (const c of candidates) {
+		const subjectEntity = await upsertEntity(env.DB, { kind: 'thing', name: c.subject });
+		await insertFact(env.DB, {
+			subject_id: subjectEntity.id,
+			predicate: c.predicate,
+			object_text: c.object,
+			valid_at: c.date ?? null,
+			confidence: EXTRACT_CONFIDENCE,
+			status: 'proposed',
+			source: refs.source,
+			source_message_id: refs.source_message_id,
+			source_ref: refs.source_ref
+		});
+	}
+	return candidates.length;
 }
 
 // Ask the model to extract household facts from `text` and store each as a
@@ -91,22 +117,7 @@ async function runExtraction(
 		]
 	})) as { response?: string };
 
-	const candidates = parseExtractedFacts(result.response ?? '');
-	for (const c of candidates) {
-		const subjectEntity = await upsertEntity(env.DB, { kind: 'thing', name: c.subject });
-		await insertFact(env.DB, {
-			subject_id: subjectEntity.id,
-			predicate: c.predicate,
-			object_text: c.object,
-			valid_at: c.date ?? null,
-			confidence: EXTRACT_CONFIDENCE,
-			status: 'proposed',
-			source: refs.source,
-			source_message_id: refs.source_message_id,
-			source_ref: refs.source_ref
-		});
-	}
-	return candidates.length;
+	return storeProposedFacts(env, parseExtractedFacts(result.response ?? ''), refs);
 }
 
 // Extract candidate facts from a posted conversation message (M73).

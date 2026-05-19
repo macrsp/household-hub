@@ -67,6 +67,9 @@
 	let calendarFacts = $state<CoordFact[]>([]);
 	let shoppingItems = $state<CoordFact[]>([]);
 	let newItem = $state('');
+	// Snap-a-flyer (M80).
+	let flyerScanning = $state(false);
+	let flyerNotice = $state('');
 	$effect(() => {
 		if (memoryPersonId !== '') {
 			loadProposed();
@@ -314,6 +317,43 @@
 		}
 	}
 
+	// Snap-a-flyer (M80): upload a photographed flyer; its events become
+	// proposed facts. The image is sent as the raw request body and not stored.
+	async function scanFlyer(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file || memoryPersonId === '') return;
+		flyerScanning = true;
+		flyerNotice = '';
+		try {
+			const res = await fetch(
+				`/api/memory/flyer?personId=${encodeURIComponent(memoryPersonId)}`,
+				{
+					method: 'POST',
+					headers: { 'content-type': file.type || 'application/octet-stream' },
+					body: file
+				}
+			);
+			const data = (await res.json().catch(() => null)) as
+				| { available?: boolean; proposed?: number }
+				| null;
+			if (res.ok && data?.available) {
+				flyerNotice =
+					(data.proposed ?? 0) > 0
+						? `Found ${data.proposed} item${data.proposed === 1 ? '' : 's'} — see "facts to review" above.`
+						: 'No event found on that flyer.';
+				loadProposed();
+			} else {
+				flyerNotice = 'Couldn’t read that flyer right now.';
+			}
+		} catch {
+			flyerNotice = 'Could not upload the flyer — network error.';
+		} finally {
+			flyerScanning = false;
+			input.value = '';
+		}
+	}
+
 	onMount(() => {
 		load();
 		// Surface the outcome of a Gmail OAuth round trip (the callback
@@ -448,6 +488,27 @@
 						</li>
 					{/each}
 				</ul>
+			</div>
+
+			<div class="coord">
+				<h3 class="memory-review-title">📷 Scan a flyer</h3>
+				<p class="memory-hint">
+					Photograph a flyer, notice, or invitation — the AI reads it and proposes any
+					event for review. The photo is not stored.
+				</p>
+				<input
+					type="file"
+					accept="image/*"
+					capture="environment"
+					onchange={scanFlyer}
+					disabled={flyerScanning}
+				/>
+				{#if flyerScanning}
+					<p class="memory-hint">Reading the flyer…</p>
+				{/if}
+				{#if flyerNotice}
+					<p class="gmail-notice">{flyerNotice}</p>
+				{/if}
 			</div>
 
 			<div class="coord">
