@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDigestSections, digestSince } from './digest';
+import { formatDigestSections, digestSince, upcomingFacts } from './digest';
 
 describe('formatDigestSections', () => {
 	it('groups messages under a header per conversation', () => {
@@ -30,5 +30,23 @@ describe('digestSince', () => {
 		const now = new Date('2026-05-18T12:00:00.000Z');
 		expect(digestSince(24, now)).toBe('2026-05-17T12:00:00.000Z');
 		expect(digestSince(1, now)).toBe('2026-05-18T11:00:00.000Z');
+	});
+});
+
+describe('upcomingFacts', () => {
+	const now = new Date('2026-05-19T12:00:00.000Z');
+	const facts = (...dates: Array<string | null>) =>
+		dates.map((valid_at) => ({ valid_at })) as unknown as Parameters<typeof upcomingFacts>[0];
+
+	it('keeps facts from today through the next week', () => {
+		expect(upcomingFacts(facts('2026-05-19', '2026-05-22', '2026-05-26'), now)).toHaveLength(3);
+	});
+
+	it('excludes past, far-future, and undated facts', () => {
+		expect(upcomingFacts(facts('2026-05-10', '2026-06-30', null), now)).toHaveLength(0);
+	});
+
+	it('handles a date that carries a time', () => {
+		expect(upcomingFacts(facts('2026-05-20 09:00'), now)).toHaveLength(1);
 	});
 });
