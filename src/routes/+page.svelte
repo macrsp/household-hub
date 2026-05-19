@@ -1209,7 +1209,7 @@
 <main>
 	<header>
 		<div class="titlebar">
-			<h1>Household Hub</h1>
+			<h1><img class="brand-logo" src="/favicon.png" alt="" />Household Hub</h1>
 			<div class="titlebar-actions">
 				{#if pushAvailable && !pushSubscribed}
 					<button
@@ -1934,6 +1934,13 @@
 	h1 {
 		margin: 0;
 		font-size: 1.25rem;
+	}
+
+	.brand-logo {
+		height: 1.5em;
+		width: auto;
+		vertical-align: -0.34em;
+		margin-right: 0.4rem;
 	}
 
 	.titlebar {

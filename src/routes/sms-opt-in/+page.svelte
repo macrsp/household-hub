@@ -51,7 +51,7 @@
 <main>
 	<p class="back"><a href="/">&larr; back to household-hub</a></p>
 
-	<h1>household-hub — SMS Opt-In</h1>
+	<h1><img class="brand-logo" src="/favicon.png" alt="" />household-hub — SMS Opt-In</h1>
 
 	{#if done}
 		<p class="success" role="status">
@@ -143,6 +143,13 @@
 	h1 {
 		font-size: 1.4rem;
 		margin: 0.5rem 0 0.75rem;
+	}
+
+	.brand-logo {
+		height: 1.5em;
+		width: auto;
+		vertical-align: -0.34em;
+		margin-right: 0.4rem;
 	}
 
 	.disclosure {
