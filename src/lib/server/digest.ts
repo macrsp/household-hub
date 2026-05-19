@@ -1,6 +1,9 @@
-// Household-digest helpers (M61). The route at GET /api/digest gathers recent
-// messages across every active conversation; this module groups them into a
-// single transcript the model can read.
+// Household-digest helpers (M61, M79). The digest gathers recent messages
+// across every active conversation into an AI summary, and — since M79 — also
+// reports what is coming up on the calendar and what memory facts are waiting
+// for review, so the daily digest reads as a real household briefing.
+
+import { datedFacts, proposedFactsWithNames, type FactWithNames } from './db';
 
 export interface DigestRow {
 	conversation_name: string;
@@ -32,24 +35,43 @@ export function digestSince(hours = 24, now: Date = new Date()): string {
 	return new Date(now.getTime() - hours * 3600 * 1000).toISOString();
 }
 
+// How many days ahead the digest's "coming up" section looks.
+const DIGEST_HORIZON_DAYS = 7;
+
+// Filter dated memory facts to those happening from today through the next
+// week — the digest's "coming up" section. Pure; unit-tested.
+export function upcomingFacts(facts: FactWithNames[], now: Date = new Date()): FactWithNames[] {
+	const today = now.toISOString().slice(0, 10);
+	const horizon = new Date(now.getTime() + DIGEST_HORIZON_DAYS * 86_400_000)
+		.toISOString()
+		.slice(0, 10);
+	return facts.filter((f) => {
+		if (!f.valid_at) return false;
+		const day = f.valid_at.slice(0, 10);
+		return day >= today && day <= horizon;
+	});
+}
+
 // The Workers AI text model used to write the household digest.
 const DIGEST_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 // How far back the digest looks, and how many messages it will read.
 const DIGEST_HOURS = 24;
 const DIGEST_LIMIT = 80;
 
-// Generate the household digest — an AI summary of the last day's activity
-// across every active conversation (M61). Shared by GET /api/digest (M61) and
-// POST /api/digest/post (M63).
+// Generate the household digest — an AI summary of the last day's activity,
+// followed by what is coming up on the calendar and what memory facts await
+// review (M61, M79). Shared by GET /api/digest and POST /api/digest/post.
 //
-// Returns { available: false } when the model call fails, and a non-failure
-// { available: true, digest: '' } when nothing happened in the window.
+// Returns { available: false } only when the model call fails on a day that
+// had conversation activity to summarise. A quiet day with nothing at all is
+// the non-failure { available: true, digest: '' }.
 export async function generateDigest(
 	ai: Ai,
 	db: D1Database
 ): Promise<{ available: boolean; digest: string }> {
-	// Recent readable messages across all non-archived conversations,
-	// oldest-first so each conversation reads in order.
+	const sections: string[] = [];
+
+	// 1. The AI summary of recent conversation activity.
 	const { results } = await db
 		.prepare(
 			`SELECT c.name AS conversation_name, p.display_name AS author_name, m.body
@@ -65,34 +87,51 @@ export async function generateDigest(
 		.bind(digestSince(DIGEST_HOURS))
 		.all<DigestRow>();
 
-	// Nothing happened in the window — not a failure, just an empty digest.
-	if (results.length === 0) {
-		return { available: true, digest: '' };
+	if (results.length > 0) {
+		const prompt = [
+			`Summarise what happened across these family conversations in the last`,
+			`day. Group the summary by conversation, one short paragraph each, and`,
+			`call out any plans, decisions, or things someone needs to do. Be`,
+			`concise and do not invent anything not in the messages.`,
+			``,
+			formatDigestSections(results)
+		].join('\n');
+		try {
+			const result = (await ai.run(DIGEST_MODEL, {
+				messages: [
+					{
+						role: 'system',
+						content: 'You write a brief daily digest of a family’s group chats.'
+					},
+					{ role: 'user', content: prompt }
+				]
+			})) as { response?: string };
+			const summary = (result.response ?? '').trim();
+			if (summary !== '') sections.push(summary);
+		} catch (e) {
+			console.error('[digest] Workers AI call failed', e);
+			return { available: false, digest: '' };
+		}
 	}
 
-	const prompt = [
-		`Summarise what happened across these family conversations in the last`,
-		`day. Group the summary by conversation, one short paragraph each, and`,
-		`call out any plans, decisions, or things someone needs to do. Be`,
-		`concise and do not invent anything not in the messages.`,
-		``,
-		formatDigestSections(results)
-	].join('\n');
-
-	try {
-		const result = (await ai.run(DIGEST_MODEL, {
-			messages: [
-				{
-					role: 'system',
-					content: 'You write a brief daily digest of a family’s group chats.'
-				},
-				{ role: 'user', content: prompt }
-			]
-		})) as { response?: string };
-		const digest = (result.response ?? '').trim();
-		return { available: digest !== '', digest };
-	} catch (e) {
-		console.error('[digest] Workers AI call failed', e);
-		return { available: false, digest: '' };
+	// 2. Coming up — confirmed dated facts in the next week.
+	const upcoming = upcomingFacts(await datedFacts(db));
+	if (upcoming.length > 0) {
+		const lines = upcoming.map((f) => {
+			const object = f.object_text ?? f.object_name ?? '';
+			return `- ${f.valid_at}: ${f.subject_name} ${f.predicate.replace(/_/g, ' ')} ${object}`.trimEnd();
+		});
+		sections.push(`📅 Coming up:\n${lines.join('\n')}`);
 	}
+
+	// 3. To review — memory facts the AI proposed and nobody has confirmed yet.
+	const proposedCount = (await proposedFactsWithNames(db)).length;
+	if (proposedCount > 0) {
+		const noun = proposedCount === 1 ? 'fact is' : 'facts are';
+		sections.push(
+			`📋 ${proposedCount} household ${noun} waiting for review on the Household page.`
+		);
+	}
+
+	return { available: true, digest: sections.join('\n\n') };
 }
