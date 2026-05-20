@@ -1,8 +1,9 @@
 <script lang="ts">
-	// SMS opt-in consent form (M34). A household member records their explicit
-	// agreement to receive the household's text messages — the documented,
-	// verifiable consent A2P 10DLC requires. Submitting POSTs to
-	// /api/sms-consent, which stores one row in `sms_consents`.
+	// SMS opt-in consent form (M34, hardened for A2P resubmission). A household
+	// member records their explicit agreement to receive the household's text
+	// messages — the documented, verifiable consent A2P 10DLC requires.
+	// Submitting POSTs to /api/sms-consent, which stores one row in
+	// `sms_consents`.
 	let name = $state('');
 	let phone = $state('');
 	let agreed = $state(false);
@@ -63,20 +64,47 @@
 	{:else}
 		<p>
 			Use this form to opt in to the <strong>household-hub</strong> SMS messaging
-			program. household-hub is a private relay for one household: when a member
-			sends a message it is relayed to the other members of that household. By
-			opting in you agree to receive these messages by text.
+			program. household-hub is a private relay for one household: when a member sends
+			a message it is relayed to the other members of that household. By opting in you
+			agree to receive these messages by text.
 		</p>
 
-		<p class="disclosure">
-			By submitting this form you agree to receive <strong>recurring SMS text
-			messages</strong> from the household-hub relay (household coordination,
-			reminders, plans, and logistics). Message frequency varies with household
-			activity. <strong>Message and data rates may apply.</strong> Reply
-			<strong>HELP</strong> for help and <strong>STOP</strong> to opt out at any
-			time. See the <a href="/sms-terms">SMS Terms of Service</a> and
-			<a href="/privacy">Privacy Policy</a>. Your mobile number and consent are
-			never sold or shared with any third party for marketing.
+		<h2>What you'll receive</h2>
+		<p>
+			Conversational household messages from the other members of your household —
+			coordination, reminders, plans, and logistics. Examples of the messages you
+			might receive:
+		</p>
+		<ul class="samples">
+			<li>
+				<em>household-hub: You're now set up to receive your household's messages by
+				text. Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.</em>
+				(one-time confirmation after opting in)
+			</li>
+			<li><em>[Sarah]: I'll be home around 6, picking up dinner on the way.</em></li>
+			<li>
+				<em>[Dad]: Can someone walk the dog this afternoon? I'm stuck at work.</em>
+			</li>
+			<li>
+				<em>[Mom]: Heads up — soccer practice is cancelled tomorrow because of the
+				weather.</em>
+			</li>
+		</ul>
+		<p>
+			<strong>Message frequency varies</strong> with household activity — there is no
+			fixed cadence. <strong>Message and data rates may apply</strong> (charged by your
+			mobile carrier, not by household-hub). Reply <strong>HELP</strong> for help; reply
+			<strong>STOP</strong> at any time to stop receiving texts. The program sends no
+			marketing, promotional, or advertising content.
+		</p>
+
+		<p class="emphasis">
+			<strong>Privacy:</strong> No mobile information — including your mobile phone
+			number, SMS opt-in data, and consent — is sold, rented, or shared with any third
+			party or affiliate for marketing or promotional purposes. SMS opt-in data and
+			consent are not shared with any third party for any purpose. Full details are in
+			the <a href="/sms-terms">SMS Terms of Service</a> and
+			<a href="/privacy">Privacy Policy</a>.
 		</p>
 
 		<form
@@ -98,9 +126,18 @@
 			<label class="consent">
 				<input type="checkbox" bind:checked={agreed} />
 				<span>
-					I agree to receive recurring SMS text messages from household-hub at the
-					number above. Message frequency varies; message and data rates may apply.
-					Reply HELP for help, STOP to opt out.
+					By checking this box and pressing <strong>Give consent</strong>, I expressly
+					agree to receive recurring SMS text messages from household-hub at the
+					mobile number above. These messages are conversational household
+					communications relayed from other members of my household; message
+					frequency varies with household activity.
+					<strong>Msg &amp; data rates may apply.</strong> Reply
+					<strong>HELP</strong> for help, or <strong>STOP</strong> to cancel at any
+					time. I confirm I am the account holder of this mobile number (or have the
+					account holder's permission) and I am at least 18 years old. I have read
+					and agree to the <a href="/sms-terms">SMS Terms of Service</a> and the
+					<a href="/privacy">Privacy Policy</a>. Consent is not a condition of any
+					purchase.
 				</span>
 			</label>
 
@@ -112,6 +149,11 @@
 				{submitting ? 'Submitting…' : 'Give consent'}
 			</button>
 		</form>
+
+		<p class="carriers">
+			Carriers — including AT&amp;T, T-Mobile, Verizon Wireless, U.S. Cellular, Sprint,
+			and Boost — are not liable for delayed or undelivered messages.
+		</p>
 	{/if}
 </main>
 
@@ -129,7 +171,7 @@
 	}
 
 	main {
-		max-width: 560px;
+		max-width: 600px;
 		margin: 0 auto;
 		padding: 1.5rem 1.25rem 3rem;
 		background: var(--surface);
@@ -152,7 +194,22 @@
 		margin-right: 0.4rem;
 	}
 
-	.disclosure {
+	h2 {
+		font-size: 1rem;
+		margin: 1.2rem 0 0.3rem;
+	}
+
+	.samples {
+		margin: 0.4rem 0;
+		padding-left: 1.1rem;
+	}
+
+	.samples li {
+		margin: 0.3rem 0;
+		font-size: 0.92rem;
+	}
+
+	.emphasis {
 		background: var(--raised);
 		border-left: 3px solid var(--accent);
 		padding: 0.6rem 0.8rem;
@@ -196,10 +253,11 @@
 		gap: 0.5rem;
 		font-weight: 400;
 		font-size: 0.88rem;
+		line-height: 1.5;
 	}
 
 	label.consent input {
-		margin-top: 0.2rem;
+		margin-top: 0.25rem;
 		flex: none;
 	}
 
@@ -224,6 +282,12 @@
 		margin: 0;
 		color: var(--danger);
 		font-size: 0.88rem;
+	}
+
+	.carriers {
+		margin-top: 1.2rem;
+		font-size: 0.82rem;
+		color: var(--dim);
 	}
 
 	a {
