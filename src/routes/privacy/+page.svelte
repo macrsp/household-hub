@@ -170,6 +170,11 @@
 
 	<h2>SMS / text messaging</h2>
 	<p>
+		Opting in to SMS is optional — a household member may take part through the web app
+		or by email without consenting to SMS. Consent to receive SMS is not required to
+		create an account, complete a purchase, or use any household-hub service.
+	</p>
+	<p>
 		A household member consents to receive SMS messages by completing the opt-in form at
 		<a href="/sms-opt-in">household.practicepartner.app/sms-opt-in</a>, where they provide
 		their mobile number and explicitly agree to take part. SMS messages relay messages that
@@ -179,10 +184,12 @@
 		in the <a href="/sms-terms">SMS Terms of Service</a>.
 	</p>
 	<p class="emphasis">
-		No mobile information — including mobile phone numbers and SMS opt-in or consent — is
-		sold, rented, or shared with any third party or affiliate for marketing or promotional
-		purposes. SMS opt-in data and consent are not shared with any third party for any
-		purpose.
+		Information you provide to opt in to SMS — including your phone number and consent —
+		is used <strong>solely to deliver the household-hub messaging program</strong>. No
+		mobile information — including mobile phone numbers and SMS opt-in or consent — is
+		sold, rented, or shared with any third party or affiliate for marketing or
+		promotional purposes. SMS opt-in data and consent are not shared with any third party
+		for any purpose.
 	</p>
 
 	<h2>How information is shared</h2>
