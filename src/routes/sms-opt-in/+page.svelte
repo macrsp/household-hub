@@ -70,10 +70,11 @@
 		</p>
 
 		<p class="optional">
-			<strong>SMS is optional.</strong> Opting in to SMS is not required to use
-			household-hub. A member can take part through the web app or by email without
-			ever opting in to SMS. SMS is one of three optional channels — choose whichever
-			you prefer.
+			<strong>SMS messaging is optional.</strong> You can use household-hub without
+			subscribing to SMS — consent to receive text messages is not required to create
+			an account, complete a purchase, or use any household-hub service. A member can
+			take part through the web app or by email without ever opting in to SMS; SMS is
+			one of three optional channels.
 		</p>
 
 		<h2>What you'll receive</h2>
@@ -106,11 +107,12 @@
 		</p>
 
 		<p class="emphasis">
-			<strong>Privacy:</strong> No mobile information — including your mobile phone
-			number, SMS opt-in data, and consent — is sold, rented, or shared with any third
-			party or affiliate for marketing or promotional purposes. SMS opt-in data and
-			consent are not shared with any third party for any purpose. Full details are in
-			the <a href="/sms-terms">SMS Terms of Service</a> and
+			<strong>Privacy:</strong> The mobile number and consent you provide are used
+			solely to deliver the household-hub SMS messaging program. No mobile information
+			— including your phone number, SMS opt-in data, and consent — is sold, rented, or
+			shared with any third party or affiliate for marketing or promotional purposes.
+			SMS opt-in data and consent are not shared with any third party for any purpose.
+			Full details are in the <a href="/sms-terms">SMS Terms of Service</a> and
 			<a href="/privacy">Privacy Policy</a>.
 		</p>
 
@@ -143,9 +145,9 @@
 					time. I confirm I am the account holder of this mobile number (or have the
 					account holder's permission) and I am at least 18 years old. I have read
 					and agree to the <a href="/sms-terms">SMS Terms of Service</a> and the
-					<a href="/privacy">Privacy Policy</a>. Consent is not required to use
-					household-hub — the SMS program is one optional way to receive your
-					household's messages.
+					<a href="/privacy">Privacy Policy</a>. Consent is not a condition of
+					purchase or of using household-hub — the SMS program is one optional way
+					to receive your household's messages.
 				</span>
 			</label>
 
