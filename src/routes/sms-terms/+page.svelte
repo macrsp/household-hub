@@ -37,14 +37,43 @@
 		is not a condition for service or for completing any transaction.
 	</p>
 
-	<h2>Message types</h2>
-	<p>
-		Messages are conversational household communications written by other members of the
-		same household. They cover household coordination, reminders, plans, and logistics.
-		The program also sends one welcome message after a member opts in, and one
-		confirmation message after a member texts STOP or HELP. The program sends no
-		marketing, promotional, or advertising content of any kind.
-	</p>
+	<h2>household-hub</h2>
+	<ol class="program">
+		<li>
+			<strong>household-hub</strong> is a private household messaging relay. When you
+			opt in, you'll receive recurring conversational SMS messages relayed from other
+			members of your household — household coordination, reminders, plans, and
+			logistics. The program also sends a one-time welcome message after you opt in,
+			and a one-time confirmation after you text STOP or HELP. The program sends no
+			marketing, promotional, or advertising content.
+		</li>
+		<li>
+			You can cancel the SMS service at any time. Just text "<strong>STOP</strong>" to
+			the number you receive messages from. After you send the SMS message "STOP" to
+			us, we will send you an SMS message to confirm that you have been unsubscribed.
+			After this, you will no longer receive SMS messages from us. If you want to join
+			again, just sign up as you did the first time and we will start sending SMS
+			messages to you again.
+		</li>
+		<li>
+			If you are experiencing issues with the messaging program you can reply with the
+			keyword <strong>HELP</strong> for more assistance, or you can get help directly
+			at <a href="mailto:help@practicepartner.app">help@practicepartner.app</a>.
+		</li>
+		<li>Carriers are not liable for delayed or undelivered messages.</li>
+		<li>
+			As always, message and data rates may apply for any messages sent to you from us
+			and to us from you. You will receive <strong>recurring messages, with frequency
+			that varies with household activity</strong> (there is no fixed cadence; a
+			message is sent only when another household member sends one through the relay).
+			If you have any questions about your text plan or data plan, it is best to
+			contact your wireless provider.
+		</li>
+		<li>
+			If you have any questions regarding privacy, please read our privacy policy:
+			<a href="/privacy">household.practicepartner.app/privacy</a>.
+		</li>
+	</ol>
 
 	<h2>Sample messages</h2>
 	<ul class="samples">
@@ -62,20 +91,6 @@
 		</li>
 	</ul>
 
-	<h2>Message frequency</h2>
-	<p>
-		Message frequency is recurring and varies with household activity. There is no fixed
-		cadence; messages are sent only when another household member sends one through the
-		relay.
-	</p>
-
-	<h2>Cost</h2>
-	<p>
-		household-hub does not charge a fee for the SMS program.
-		<strong>Message and data rates may apply</strong> — these are charged by your mobile
-		carrier, not by household-hub.
-	</p>
-
 	<h2>How to opt in</h2>
 	<p>
 		A household member opts in by completing the consent form at
@@ -92,20 +107,13 @@
 		Msg &amp; data rates may apply. Reply HELP for help, STOP to opt out.”</em>
 	</p>
 
-	<h2>Help</h2>
+	<h2>Additional opt-out keywords</h2>
 	<p>
-		Reply <strong>HELP</strong> to any message for help, or email the operator at
-		<a href="mailto:help@practicepartner.app">help@practicepartner.app</a>. A HELP reply
-		identifies the program and points to STOP for opting out.
-	</p>
-
-	<h2>Opting out</h2>
-	<p>
-		Reply <strong>STOP</strong> (or CANCEL, END, QUIT, UNSUBSCRIBE, OPTOUT, REVOKE,
-		STOPALL) to any message to stop receiving texts from household-hub. After opting out
-		you receive a single confirmation that no further messages will be sent. You can opt
-		back in at any time by replying <strong>START</strong> or by completing the opt-in
-		form again.
+		In addition to <strong>STOP</strong>, replying <strong>CANCEL</strong>,
+		<strong>END</strong>, <strong>QUIT</strong>, <strong>UNSUBSCRIBE</strong>,
+		<strong>OPTOUT</strong>, <strong>REVOKE</strong>, or <strong>STOPALL</strong>
+		will also stop further messages. You can opt back in at any time by replying
+		<strong>START</strong> or by completing the opt-in form again.
 	</p>
 
 	<h2>Privacy of your mobile information</h2>
@@ -116,13 +124,6 @@
 		party for any purpose. Information is processed only by the service providers
 		required to deliver the relay, listed in the
 		<a href="/privacy">Privacy Policy</a>.
-	</p>
-
-	<h2>Carriers</h2>
-	<p>
-		Carriers — including AT&amp;T, T-Mobile, Verizon Wireless, U.S. Cellular, Sprint, and
-		Boost — are not liable for delayed or undelivered messages. Delivery is on a
-		best-effort basis through your carrier; household-hub does not guarantee delivery.
 	</p>
 
 	<h2>Eligibility</h2>
@@ -200,6 +201,15 @@
 
 	.samples li {
 		margin: 0.3rem 0;
+	}
+
+	.program {
+		margin: 0.4rem 0;
+		padding-left: 1.4rem;
+	}
+
+	.program li {
+		margin: 0.6rem 0;
 	}
 
 	.emphasis {
