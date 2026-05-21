@@ -69,6 +69,13 @@
 			agree to receive these messages by text.
 		</p>
 
+		<p class="optional">
+			<strong>SMS is optional.</strong> Opting in to SMS is not required to use
+			household-hub. A member can take part through the web app or by email without
+			ever opting in to SMS. SMS is one of three optional channels — choose whichever
+			you prefer.
+		</p>
+
 		<h2>What you'll receive</h2>
 		<p>
 			Conversational household messages from the other members of your household —
@@ -136,8 +143,9 @@
 					time. I confirm I am the account holder of this mobile number (or have the
 					account holder's permission) and I am at least 18 years old. I have read
 					and agree to the <a href="/sms-terms">SMS Terms of Service</a> and the
-					<a href="/privacy">Privacy Policy</a>. Consent is not a condition of any
-					purchase.
+					<a href="/privacy">Privacy Policy</a>. Consent is not required to use
+					household-hub — the SMS program is one optional way to receive your
+					household's messages.
 				</span>
 			</label>
 
@@ -212,6 +220,14 @@
 	.emphasis {
 		background: var(--raised);
 		border-left: 3px solid var(--accent);
+		padding: 0.6rem 0.8rem;
+		font-size: 0.92rem;
+	}
+
+	.optional {
+		background: var(--raised);
+		border: 1px solid var(--accent);
+		border-radius: 0.5rem;
 		padding: 0.6rem 0.8rem;
 		font-size: 0.92rem;
 	}

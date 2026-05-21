@@ -29,6 +29,14 @@
 		<a href="mailto:help@practicepartner.app">help@practicepartner.app</a>.
 	</p>
 
+	<h2>SMS is optional</h2>
+	<p class="emphasis">
+		<strong>Consent to receive SMS is not required to use household-hub.</strong> SMS is
+		one of three optional channels — a household member can take part through the web
+		application or by email without ever opting in to SMS. Opting in to the SMS program
+		is not a condition for service or for completing any transaction.
+	</p>
+
 	<h2>Message types</h2>
 	<p>
 		Messages are conversational household communications written by other members of the
